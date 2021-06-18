@@ -1,0 +1,10 @@
+User Account:
+username:T0392511G,password:password
+
+Doctor Account:
+username:T1111111F,password:password
+username:T2222222F,password:password
+username:T3333333F,password:password
+
+Admin Account:
+username:T5739128U,password:password
