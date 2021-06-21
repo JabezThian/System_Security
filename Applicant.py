@@ -1,23 +1,27 @@
 import datetime
-from Users import User
 
 
-class Applicant(User):
+class Applicant():
     count_id = 0
     x = datetime.datetime.now()
 
     def __init__(self, first_name, last_name, nric, email, age, address, gender, nationality, language, phonenumber,
                  qualification,
-                 industry, company1,
-                 position1, company2, position2, empty1, empty2):
-        super().__init__(nric, first_name, last_name, gender, empty1, email, empty2)
+                 industry, company1, position1, company2, position2):
         Applicant.count_id += 1
+
         self.__applicantid = Applicant.count_id
+        self.__first_name = first_name
+        self.__last_name = last_name
+        self.__NRIC = nric
+        self.__email = email
         self.__age = age
         self.__address = address
-        self.__phonenumber = phonenumber
+        self.__gender = gender
+
         self.__nationality = nationality
         self.__language = language
+        self.__phonenumber = phonenumber
         self.__qualification = qualification
 
         self.__industry = industry
@@ -26,6 +30,21 @@ class Applicant(User):
         self.__company2 = company2
         self.__position2 = position2
         self.__date = Applicant.x.strftime("%x")
+
+    def set_NRIC(self, NRIC):
+        self.__NRIC = NRIC
+
+    def set_first_name(self, fname):
+        self.__first_name = fname
+
+    def set_last_name(self, lname):
+        self.__last_name = lname
+
+    def set_gender(self, gender):
+        self.__gender = gender
+
+    def set_email(self, email):
+        self.__email = email
 
     def set_applicantid(self, applicant_id):
         self.__applicantid = applicant_id
@@ -62,6 +81,24 @@ class Applicant(User):
 
     def set_postion2(self, position2):
         self.__position2 = position2
+
+    def get_NRIC(self):
+        return self.__NRIC
+
+    def get_first_name(self):
+        return self.__first_name
+
+    def get_last_name(self):
+        return self.__last_name
+
+    def get_name(self):
+        return self.get_first_name() + " " + self.get_last_name()
+
+    def get_gender(self):
+        return self.__gender
+
+    def get_email(self):
+        return self.__email
 
     def get_applicantid(self):
         return self.__applicantid

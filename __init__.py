@@ -11,7 +11,6 @@ import Applicant
 import Cart
 import Item
 import Resend
-import Users
 import appointments
 import qns
 from Forms import *
