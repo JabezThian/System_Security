@@ -1,5 +1,6 @@
 DROP DATABASE IF EXISTS nanyang_login;
 CREATE DATABASE IF NOT EXISTS nanyang_login;
+USE nanyang_login;
 DROP TABLE IF EXISTS Accounts;
 CREATE TABLE IF NOT EXISTS Accounts (
  nric varchar(9) NOT NULL,
@@ -19,4 +20,3 @@ VALUES
 ('T0392511G', 'Daniel', 'Jack', 'M', '1999-10-22', 'danieljack@gmail.com','password', 'Patient'),
 ('T1111111F', 'Eric', 'Lee', 'M', '1994-10-30', 'samwilson@gmail.com', 'password', 'Doctor'),
 ('T5739128U', 'Chloe', 'Soh', 'F', '1980-10-15', 'chloesoh@gmail.com', 'password', 'Admin');
-
