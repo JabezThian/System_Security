@@ -13,6 +13,7 @@ import Item
 import Resend
 import appointments
 import qns
+import shelve
 from Forms import *
 from pyechart import bargraph, applicationbargraph, addressbargraph, agerangebargraph, monthlyQnbargraph, usernumber
 
@@ -88,7 +89,7 @@ def login():
         if account:
             session["user"] = account
             session["user-name"] = account["fname"] + " " + account["lname"]
-            session["user-NRIC"] = account["NRIC"]
+            session["user-NRIC"] = account["nric"]
             session["user-role"] = account["role"]
             flash(
                 f'{account["fname"]} {account["lname"]} has logged in!',
@@ -1119,8 +1120,7 @@ def appointment():
     for key in appointment_dict:
         appointment = appointment_dict.get(key)
         if appointment.get_patient() == session["user-name"] or appointment.get_doctor() == session["user-name"] or \
-                session[
-                    "user-role"] == 'Admin':
+                session["user-role"] == 'Admin':
             appointment_list.append(appointment)
     for appt in appointment_list:
         date = appt.get_date()
@@ -1279,7 +1279,17 @@ def add_appointment():
 
 @app.route('/docappointment', methods=['GET', 'POST'])
 def doc_add_appointment():
-    form = DocAppointmentForm(request.form)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('SELECT * FROM users WHERE role = "patient"')
+
+    user_dict = cursor.fetchall()
+    patient_list = []
+
+    for user in user_dict:
+        patient_info = (user["fname"] + " " + user["lname"], user["fname"] + " " + user["lname"])
+        patient_list.append(patient_info)
+
+    form = DocAppointmentForm(request.form, patient_list)
     db = shelve.open('storage.db', 'c')
     appointment_dict = db['Appointments']
 
@@ -1301,7 +1311,8 @@ def doc_add_appointment():
             flash("Appointment has been booked!View it in appointment list!", 'success')
 
             return redirect(url_for('home'))
-    return render_template('Appointment/docappointment.html', form=form)
+
+    return render_template('Appointment/docappointment.html', form=form, patient_list=patient_list)
 
 
 @app.route('/Updateappointment/<id>', methods=['GET', 'POST'])
@@ -1591,8 +1602,7 @@ def create_applicant():
                                         create_applicant_form.industry.data,
                                         create_applicant_form.comp1.data,
                                         create_applicant_form.posi1.data, create_applicant_form.comp2.data,
-                                        create_applicant_form.posi2.data, create_applicant_form.empty1.data,
-                                        create_applicant_form.empty2.data)
+                                        create_applicant_form.posi2.data)
 
         applicants_dict[applicant.get_applicantid()] = applicant
 
