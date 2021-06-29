@@ -1,10 +1,9 @@
 from wtforms import Form, StringField, TextAreaField, DecimalField, validators, IntegerField, BooleanField, SubmitField, \
     SelectField, PasswordField, RadioField
-from wtforms.validators import DataRequired, Length, Email,Regexp
+from wtforms.validators import DataRequired, Length, Email, Regexp
 from wtforms.fields.html5 import DateField, EmailField
 from flask_wtf import FlaskForm
-import shelve
-from datetime import date
+plist = list()
 
 
 # Online Pharmacy
@@ -46,7 +45,6 @@ class PrescribeForm(Form):
     patient_nric = StringField("Patient's NRIC:", [validators.DataRequired()])
 
 
-
 # ContactUs Forms
 class ContactForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired(), Length(min=2, max=150)])
@@ -65,15 +63,19 @@ class FAQ(Form):
 # Search Bar
 class SearchBar(Form):
     search = StringField('')
-    history = SelectField('', choices=[(1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9), (10, 10)], default=2)
+    history = SelectField('',
+                          choices=[(1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9), (10, 10)],
+                          default=2)
 
 
 # Applcation
 class CreateApplicationForm(Form):
     fname = StringField('First Name', [validators.Length(min=1, max=150), validators.DataRequired()])
     lname = StringField('Last Name', [validators.Length(min=1, max=150), validators.DataRequired()])
-    nric = StringField('NRIC / FIN', [validators.Regexp('^[SsTtFfGg][0-9]{7}[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]$', message='Invalid NRIC. e.g.S1234567A'),
-                                      validators.DataRequired()])  # need to validate
+    nric = StringField('NRIC / FIN', [
+        validators.Regexp('^[SsTtFfGg][0-9]{7}[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]$',
+                          message='Invalid NRIC. e.g.S1234567A'),
+        validators.DataRequired()])  # need to validate
     email = EmailField('Email', [validators.Length(min=1, max=150), validators.DataRequired(), validators.Email()])
     age = IntegerField('Age', [validators.number_range(min=17, max=70), validators.DataRequired()])
     address = StringField('Address', [validators.Length(min=1, max=150), validators.DataRequired()])
@@ -104,8 +106,6 @@ class CreateApplicationForm(Form):
     posi1 = StringField('Position', [validators.Length(min=1, max=150), validators.DataRequired()])
     comp2 = StringField('Company (optional)', [validators.Length(min=1, max=150), validators.optional()])
     posi2 = StringField('Position (optional)', [validators.Length(min=1, max=150), validators.optional()])
-    empty1 = StringField('empty', [validators.Length(min=1, max=150), validators.optional()])
-    empty2 = StringField('empty', [validators.Length(min=1, max=150), validators.optional()])
 
 
 class ResendForm(Form):
@@ -122,14 +122,16 @@ class ResendForm(Form):
 
 # User Forms
 class RegisterForm(Form):
-    NRIC = StringField("NRIC", [validators.DataRequired(), Regexp('^[ST][0-9]{7}[ABCDEFGHIZJ]$', message='Invalid NRIC')])
-    FirstName = StringField("First Name", [validators.DataRequired(),validators.Length(min=1, max=150)])
-    LastName = StringField("Last Name", [validators.DataRequired(),validators.Length(min=1, max=150)])
+    NRIC = StringField("NRIC",
+                       [validators.DataRequired(), Regexp('^[ST][0-9]{7}[ABCDEFGHIZJ]$', message='Invalid NRIC')])
+    FirstName = StringField("First Name", [validators.DataRequired(), validators.Length(min=1, max=150)])
+    LastName = StringField("Last Name", [validators.DataRequired(), validators.Length(min=1, max=150)])
     Gender = SelectField('Gender', [validators.DataRequired()],
                          choices=[('', 'Select'), ('F', 'Female'), ('M', 'Male')], default='')
     Dob = DateField('Date of Birth', [validators.DataRequired()])
     Email = StringField("Email", [validators.DataRequired(), validators.Email()])
-    Password = PasswordField("Password", [validators.DataRequired(),Length(min=8, max=30,message="Invalid Password Length")])
+    Password = PasswordField("Password",
+                             [validators.DataRequired(), Length(min=8, max=30, message="Invalid Password Length")])
     Confirm = PasswordField("Confirm Password", [validators.DataRequired(), validators.EqualTo("Password")])
     URL = StringField("URL", [validators.optional()])
     specialization = StringField("Specialization", [validators.optional()])
@@ -156,7 +158,8 @@ class ResetPasswordForm(Form):
 
 class AdminUpdateForm(Form):
     Email = StringField("Email", [validators.DataRequired(), validators.Email()])
-    Password = PasswordField("Password", [validators.DataRequired(),Length(min=8, max=30,message="Invalid Password Length")])
+    Password = PasswordField("Password",
+                             [validators.DataRequired(), Length(min=8, max=30, message="Invalid Password Length")])
     URL = StringField("URL", [validators.optional()])
 
 
@@ -175,16 +178,13 @@ class AppointmentForm(Form):
                        choices=[('', 'Select'), ('E-Doctor', 'E-Doctor'), ('Visit', 'Visit')])
 
 
-db = shelve.open('storage.db', 'c')
-user_dict = db["Users"]
-patient_list = [('', 'Select')]
-for key in user_dict:
-    if user_dict[key].get_role() == "Patient":
-        patient_info = (user_dict[key].get_name(), user_dict[key].get_name())
-        patient_list.append(patient_info)
-
-
 class DocAppointmentForm(Form):
+    def __init__(self, form, patient_list):
+        global plist
+        super().__init__(form)
+        plist = patient_list
+
+
     Department = SelectField("Department", [validators.DataRequired()],
                              choices=[('', 'Select'), ('Cardiology', 'Cardiology'),
                                       ('Gastroenterology', 'Gastroenterology'),
@@ -196,20 +196,3 @@ class DocAppointmentForm(Form):
                                 ('18:00:00', '6PM'), ('20:00:00', '8PM'), ('22:00:00', '10PM')], default='')
     Type = SelectField("Appointment Type", [validators.DataRequired()],
                        choices=[('', 'Select'), ('E-Doctor', 'E-Doctor'), ('Visit', 'Visit')])
-    Patient = SelectField("Patient", [validators.DataRequired()], choices=patient_list, default='')
-
-
-class DocCommentForm(Form):
-    Department = SelectField("Department", [validators.DataRequired()],
-                             choices=[('', 'Select'), ('Cardiology', 'Cardiology'),
-                                      ('Gastroenterology', 'Gastroenterology'),
-                                      ('Haematology', 'Haematology')])
-    Date = DateField("Appointment Date", [validators.DataRequired()], format='%Y-%m-%d')
-    Time = SelectField("Appointment Time", [validators.DataRequired()],
-                       choices=[('', 'Select'), ('8:00:00', '8AM'), ('10:00:00', '10AM'), ('12:00:00', '12PM'),
-                                ('14:00:00', '2PM'), ('16:00:00', '4PM'),
-                                ('18:00:00', '6PM'), ('20:00:00', '8PM'), ('22:00:00', '10PM')], default='')
-    Type = SelectField("Appointment Type", [validators.DataRequired()],
-                       choices=[('', 'Select'), ('E-Doctor', 'E-Doctor'), ('Visit', 'Visit')])
-    Patient = SelectField("Patient", [validators.DataRequired()], choices=patient_list, default='')
-    Comment = StringField("Comments", [validators.Optional()])
