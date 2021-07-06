@@ -68,7 +68,7 @@ class SearchBar(Form):
                           default=2)
 
 
-# Applcation
+# Application
 class CreateApplicationForm(Form):
     fname = StringField('First Name', [validators.Length(min=1, max=150), validators.DataRequired()])
     lname = StringField('Last Name', [validators.Length(min=1, max=150), validators.DataRequired()])
