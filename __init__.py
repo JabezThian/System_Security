@@ -16,9 +16,22 @@ import qns
 import shelve
 from Forms import *
 from pyechart import bargraph, applicationbargraph, addressbargraph, agerangebargraph, monthlyQnbargraph, usernumber
+from flask_recaptcha import ReCaptcha   # Edited by Jabez (pip install Flask-reCaptcha)
 
 app = Flask(__name__, static_url_path='/static')
+# Edited by Jabez (Start)
+recaptcha = ReCaptcha(app=app)
+
+app.config.update(dict(
+    RECAPTCHA_ENABLED=True,
+    RECAPTCHA_SITE_KEY="6LcSa3wbAAAAANmKm0NqzQa9ZwAMsKfDcsRQIb8E",
+    RECAPTCHA_SECRET_KEY="6LcSa3wbAAAAALbtlSk5wy9VVO9XNqGGCjZ6m_mC",
+))
+
+recaptcha = ReCaptcha()
+recaptcha.init_app(app)
 app.config["SECRET_KEY"] = b'o5Dg987*&G^@(E&FW)}'
+# Edited by Jabez (End)
 
 # Email Server
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
@@ -64,8 +77,8 @@ def register():
             flash("This NRIC is already in used. You can login to access our service.", "danger")
             return redirect(url_for('register'))
         else:
-            cursor.execute('INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role) '
-                           'VALUES (%s, %s, %s, %s, %s, %s, %s, "Patient")',
+            cursor.execute('INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role, attempt) '
+                           'VALUES (%s, %s, %s, %s, %s, %s, %s, "Patient", 0)',
                            (NRIC, fname, lname, gender, dob, email, password,))
             mysql.connection.commit()
             flash(f'Account created for {form.FirstName.data} {form.LastName.data}!', 'success')
@@ -77,10 +90,12 @@ def register():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm(request.form)
+    print(session['attempt'])   # checking only (to be removed)
     if request.method == "POST" and form.validate():
         NRIC = form.NRIC.data
         password = form.Password.data
 
+        print(session['attempt'])
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('SELECT * FROM users WHERE NRIC = %s AND password = %s', (NRIC, password))
         account = cursor.fetchone()
@@ -88,28 +103,54 @@ def login():
         cursor.execute('SELECT NRIC, attempt FROM users WHERE NRIC = %s', (NRIC,))
         attempt_dict = cursor.fetchone()
         # Check if user is real and user's attempt is more than 5
-        if attempt_dict and attempt_dict['attempt'] > 4:
-            # do not allow the user to login and flash incorrect password
-            flash('Your account have been locked!', 'danger')
-            # add timer
-        # Edited by Jabez (end)
-        elif account:
-            # resetting the attempts back to 0
-            cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
-            mysql.connection.commit()  # Edited by Jabez
-            session["user"] = account
-            session["user-name"] = account["fname"] + " " + account["lname"]
-            session["user-NRIC"] = account["nric"]
-            session["user-role"] = account["role"]
-            flash(
-                f'{account["fname"]} {account["lname"]} has logged in!',
-                'success')
-            return redirect(url_for('home'))
-        else:
-            flash('Incorrect username or password', 'danger')
-            # SQL adding and counting failed attempts
-            cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
-            mysql.connection.commit()  # Edited by Jabez
+        if session['attempt'] >= 3:
+            if recaptcha.verify():
+                print('New Device Added successfully')
+                if attempt_dict and attempt_dict['attempt'] >= 10:
+                    # do not allow the user to login and flash incorrect password
+                    flash('Your account have been locked!', 'danger')
+                    # add timer
+                # Edited by Jabez (end)
+                elif account:
+                    # resetting the attempts back to 0
+                    cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+                    mysql.connection.commit()  # Edited by Jabez
+                    session["user"] = account
+                    session["user-name"] = account["fname"] + " " + account["lname"]
+                    session["user-NRIC"] = account["nric"]
+                    session["user-role"] = account["role"]
+                    session.pop("attempt", None)
+                    flash(
+                        f'{account["fname"]} {account["lname"]} has logged in!',
+                        'success')
+                    return redirect(url_for('home'))
+                else:
+                    flash('Incorrect username or password', 'danger')
+                    # SQL adding and counting failed attempts
+                    cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+                    mysql.connection.commit()  # Edited by Jabez
+            else:
+                print('Error ReCaptcha')
+        else:   # When attempt is not more than 3
+            if account:
+                # resetting the attempts back to 0
+                cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+                mysql.connection.commit()  # Edited by Jabez
+                session["user"] = account
+                session["user-name"] = account["fname"] + " " + account["lname"]
+                session["user-NRIC"] = account["nric"]
+                session["user-role"] = account["role"]
+                session.pop("attempt", None)
+                flash(
+                    f'{account["fname"]} {account["lname"]} has logged in!',
+                    'success')
+                return redirect(url_for('home'))
+            else:
+                flash('Incorrect username or password', 'danger')
+                # SQL adding and counting failed attempts
+                cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+                mysql.connection.commit()  # Edited by Jabez
+                session["attempt"] += 1
     return render_template('Login/login.html', form=form)
 
 
