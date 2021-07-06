@@ -31,7 +31,7 @@ app.config["DEFAULT_MAIL_SENDER"] = "nanyanghospital2021@gmail.com"
 # SQL Server
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'FeioyFTW_GSA'
+app.config['MYSQL_PASSWORD'] = 'password'
 app.config['MYSQL_DB'] = 'nanyang_login'
 
 # Initialize MySQL
@@ -44,8 +44,7 @@ def home():
     return render_template('home.html')
 
 
-# Login system
-
+# Register system
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegisterForm(request.form)
@@ -74,6 +73,7 @@ def register():
     return render_template('Login/register.html', form=form)
 
 
+# Login system
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm(request.form)
@@ -82,11 +82,21 @@ def login():
         password = form.Password.data
 
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM users WHERE NRIC = %s AND password = %s', (NRIC, password,))
-
+        cursor.execute('SELECT * FROM users WHERE NRIC = %s AND password = %s', (NRIC, password))
         account = cursor.fetchone()
-
-        if account:
+        # Edited by Jabez (start)
+        cursor.execute('SELECT NRIC, attempt FROM users WHERE NRIC = %s', (NRIC,))
+        attempt_dict = cursor.fetchone()
+        # Check if user is real and user's attempt is more than 5
+        if attempt_dict and attempt_dict['attempt'] > 4:
+            # do not allow the user to login and flash incorrect password
+            flash('Your account have been locked!', 'danger')
+            # add timer
+        # Edited by Jabez (end)
+        elif account:
+            # resetting the attempts back to 0
+            cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+            mysql.connection.commit()  # Edited by Jabez
             session["user"] = account
             session["user-name"] = account["fname"] + " " + account["lname"]
             session["user-NRIC"] = account["nric"]
@@ -97,10 +107,13 @@ def login():
             return redirect(url_for('home'))
         else:
             flash('Incorrect username or password', 'danger')
-
+            # SQL adding and counting failed attempts
+            cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+            mysql.connection.commit()  # Edited by Jabez
     return render_template('Login/login.html', form=form)
 
 
+# Logout system
 @app.route("/logout")
 def logout():
     session.pop("user", None)
@@ -109,7 +122,7 @@ def logout():
     return redirect(url_for("home"))
 
 
-# Profile
+# Profile System
 @app.route('/profile', methods=["GET", "POST"])
 def profile():
     form = UpdateProfileForm(request.form)
@@ -121,6 +134,11 @@ def profile():
 
     if request.method == "POST" and form.validate():
         cursor.execute('UPDATE users SET email = %s, dob = %s WHERE NRIC = %s', (form.Email.data, form.Dob.data, NRIC,))
+        mysql.connection.commit()  # Edited by Jabez
+        cursor.execute('SELECT * from users')  # Edited by Jabez
+        account = cursor.fetchone()  # Edited by Jabez
+        session["user"] = account  # Edited by Jabez
+        return redirect(url_for('profile'))  # Edited by Jabez
 
     return render_template("Login/profile.html", form=form, user=user)
 
@@ -136,6 +154,7 @@ def change_password():
 
     if request.method == "POST" and form.validate():
         cursor.execute('UPDATE users SET password = %s WHERE NRIC = %s', (form.Password.data, NRIC,))
+        mysql.connection.commit()  # Edited by Jabez
         return redirect(url_for('home'))
 
     return render_template('Login/change_password.html', form=form)
@@ -172,7 +191,7 @@ def reset_password():
         msg = Message(subject="Password reset", recipients=[form.Email.data],
                       body="Link to reset password : {}{}. Link valid for only 5 minutes" \
                       .format(request.url_root, url_for("confirm_reset", token=token)),
-                      sender="flaskapptest123@gmail.com")
+                      sender="nanyanghospital2021@gmail.com")
         mail.send(msg)
 
         flash("Successfully entered email, if you have registered an account with us, a reset password email would"
@@ -195,6 +214,7 @@ def confirm_reset(token):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     if request.method == "POST" and form.validate():
         cursor.execute('UPDATE users SET password = %s WHERE NRIC = %s', (form.Password.data, NRIC,))
+        mysql.connection.commit()  # Edited by Jabez
         flash("Successfully reset password", "success")
         return redirect(url_for("login"))
 
