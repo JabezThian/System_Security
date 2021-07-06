@@ -263,6 +263,7 @@ img {
   <div class="form-group">
     {{ render_field(form.Password, class="form-control") }}
   </div>
+    {{recaptcha }} <br/>  <!-- Need if statement of attempt being more than or equal 3 than appear-->
 <input type="submit" value="Login" class="btn btn-primary"/>
 </form>
 <div>
