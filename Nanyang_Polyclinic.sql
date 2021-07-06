@@ -1,5 +1,5 @@
 CREATE DATABASE IF NOT EXISTS nanyang_login;
-DROP TABLE IF EXISTS Users;
+DROP TABLE IF EXISTS users;
 USE nanyang_login;
 CREATE TABLE IF NOT EXISTS Users (
  nric varchar(9) NOT NULL,
