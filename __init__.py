@@ -44,12 +44,17 @@ app.config["DEFAULT_MAIL_SENDER"] = "nanyanghospital2021@gmail.com"
 # SQL Server
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'password'
+app.config['MYSQL_PASSWORD'] = 'Sparklez2002'
 app.config['MYSQL_DB'] = 'nanyang_login'
 
 # Initialize MySQL
 mysql = MySQL(app)
 mail = Mail(app)
+
+
+@app.before_first_request
+def do_something_once_only():
+    session['attempt'] = 0
 
 
 @app.route('/')
@@ -90,12 +95,11 @@ def register():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm(request.form)
-    print(session['attempt'])   # checking only (to be removed)
+    attempt = session['attempt']
     if request.method == "POST" and form.validate():
         NRIC = form.NRIC.data
         password = form.Password.data
 
-        print(session['attempt'])
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('SELECT * FROM users WHERE NRIC = %s AND password = %s', (NRIC, password))
         account = cursor.fetchone()
@@ -103,7 +107,7 @@ def login():
         cursor.execute('SELECT NRIC, attempt FROM users WHERE NRIC = %s', (NRIC,))
         attempt_dict = cursor.fetchone()
         # Check if user is real and user's attempt is more than 5
-        if session['attempt'] >= 3:
+        if attempt >= 3:
             if recaptcha.verify():
                 print('New Device Added successfully')
                 if attempt_dict and attempt_dict['attempt'] >= 10:
@@ -119,7 +123,7 @@ def login():
                     session["user-name"] = account["fname"] + " " + account["lname"]
                     session["user-NRIC"] = account["nric"]
                     session["user-role"] = account["role"]
-                    session.pop("attempt", None)
+                    session['attempt'] = 0
                     flash(
                         f'{account["fname"]} {account["lname"]} has logged in!',
                         'success')
@@ -140,7 +144,7 @@ def login():
                 session["user-name"] = account["fname"] + " " + account["lname"]
                 session["user-NRIC"] = account["nric"]
                 session["user-role"] = account["role"]
-                session.pop("attempt", None)
+                session['attempt'] = 0
                 flash(
                     f'{account["fname"]} {account["lname"]} has logged in!',
                     'success')
@@ -150,8 +154,10 @@ def login():
                 # SQL adding and counting failed attempts
                 cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
                 mysql.connection.commit()  # Edited by Jabez
-                session["attempt"] += 1
-    return render_template('Login/login.html', form=form)
+                attempt += 1
+                session['attempt'] = attempt
+                print(attempt)
+    return render_template('Login/login.html', **locals())
 
 
 # Logout system
