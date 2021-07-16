@@ -24,3 +24,12 @@ body{
 span{
      margin-right:50px;
 }
+
+.notfound{
+    text-align:center;
+}
+
+.image{
+    height: 300px;
+    padding-top: 50px;
+}
