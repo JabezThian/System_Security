@@ -54,13 +54,19 @@ def do_something_once_only():
     session['attempt'] = 0
 
 
-def permission(perm):
+def permission(perm, key):
     try:
-        if session['user-role'] not in perm:
-            return abort(404)
+        if key == "role":
+            if session['user-role'] not in perm:
+                return abort(404)
+
+        elif key == "nric":
+            if session["user-NRIC"] not in perm:
+                return abort(404)
+
     except KeyError:
         if 'NULL' not in perm:
-            return abort(404)
+                return abort(404)
 
 
 @app.route('/')
@@ -71,7 +77,7 @@ def home():
 # Register system
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    permission(['NULL']) # melvin
+    permission(["NULL"], "role")
 
     form = RegisterForm(request.form)
     if request.method == "POST" and form.validate():
@@ -102,7 +108,7 @@ def register():
 # Login system
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    permission(['NULL'])
+    permission(["NULL"], "role")
 
     form = LoginForm(request.form)
     attempt = session['attempt']
@@ -173,7 +179,7 @@ def login():
 # Logout system
 @app.route("/logout")
 def logout():
-    permission(["Patient", "Doctor", "Admin"])
+    permission(["Patient", "Doctor", "Admin"], "role")
 
     session.pop("user", None)
     session.pop("user-NRIC", None)
@@ -184,7 +190,7 @@ def logout():
 # Profile System
 @app.route('/profile', methods=["GET", "POST"])
 def profile():
-    permission(["Patient", "Doctor", "Admin"])
+    permission(["Patient", "Doctor", "Admin"], "role")
 
     form = UpdateProfileForm(request.form)
 
@@ -208,7 +214,7 @@ def profile():
 # User password management
 @app.route('/change_password', methods=["GET", "POST"])
 def change_password():
-    permission(["Patient", "Doctor", "Admin"])
+    permission(["Patient", "Doctor", "Admin"], "role")
 
     form = ChangePasswordForm(request.form)
 
@@ -442,7 +448,7 @@ def show_new():
 
 @app.route('/purchaseHistory', methods=['GET', 'POST'])
 def purchaseHistory():
-    permission(["Patient", "Doctor", "Admin"])
+    permission(["Patient", "Doctor", "Admin"], "role")
 
     search = SearchBar(request.form)
     user_id = session["user-NRIC"]
@@ -506,7 +512,7 @@ def purchaseHistory():
 
 @app.route('/pharmacy/dashboard', methods=['GET'])
 def dashboard():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     total_sales = int()
     general_list = list()
@@ -570,7 +576,7 @@ def dashboard():
 # CRUD Items
 @app.route('/createItem', methods=['GET', 'POST'])
 def create_item():
-    permission(['Admin']) # melvin
+    permission(["Admin"], "role")
 
     create_item_form = CreateItemForm(request.form)
     if request.method == 'POST' and create_item_form.validate():
@@ -603,7 +609,7 @@ def create_item():
 
 @app.route('/inventory')
 def inventory():
-    permission(["Admin"]) # melvin
+    permission(["Admin"], "role")
 
     db = shelve.open('storage.db', 'r')
     item_dict = db['Items']
@@ -619,7 +625,7 @@ def inventory():
 
 @app.route('/updateItem/<int:id>/', methods=['GET', 'POST'])
 def update_item(id):
-    permission(["Admin"]) # melvin
+    permission(["Admin"], "role")
 
     update_item_form = CreateItemForm(request.form)
 
@@ -655,7 +661,7 @@ def update_item(id):
 
 @app.route('/deleteItem/<int:id>', methods=['POST'])
 def delete_item(id):
-    permission(["Admin"]) # melvin
+    permission(["Admin"], "role")
 
     db = shelve.open('storage.db', 'w')
     item_dict = db['Items']
@@ -671,7 +677,7 @@ def delete_item(id):
 # CRUD Shopping Cart
 @app.route('/purchaseItem/<int:id>/', methods=['GET', 'POST'])
 def buy_item(id):
-    permission(["Admin"]) # melvin
+    permission(["Admin"], "role")
 
     buy_item_form = BuyItemForm(request.form)
 
@@ -774,6 +780,7 @@ def shopping_cart():
 
 @app.route('/shoppingCart/<int:id>', methods=['GET', 'POST'])
 def specific_cart(id):
+
     search = SearchBar(request.form)
     if request.method == 'POST':
         db = shelve.open('storage.db', 'r')
@@ -803,6 +810,9 @@ def specific_cart(id):
     db.close()
 
     cart = cart_dict[id]
+
+    if session["user-role"] != "Admin":
+        permission([cart.get_owner()], "nric")
 
     item_list = cart.get_cart()
     total = cart.total()
@@ -910,7 +920,7 @@ def paid():
 # CRUD Prescription
 @app.route('/prescription', methods=['GET', 'POST'])
 def prescription():
-    permission(["Patient", "Doctor"])
+    permission(["Patient", "Doctor"], "role")
 
     search = SearchBar(request.form)
     if request.method == 'POST':
@@ -948,7 +958,7 @@ def prescription():
 
 @app.route('/prescribeItem/<int:id>/', methods=['GET', 'POST'])
 def prescribe_item(id):
-    permission(["Patient", "Doctor"])
+    permission(["Patient", "Doctor"], "role")
 
     prescribe_item_form = PrescriptionForm(request.form)
 
@@ -1007,7 +1017,7 @@ def prescribe_item(id):
 
 @app.route('/prescription/prescribe', methods=['GET', 'POST'])
 def prescription_cart():
-    permission(["Patient", "Doctor"])
+    permission(["Patient", "Doctor"], "role")
 
     search = SearchBar(request.form)
     if request.method == 'POST':
@@ -1061,7 +1071,7 @@ def prescription_cart():
 
 @app.route('/prescribe', methods=['GET', 'POST'])
 def prescribe():
-    permission(["Doctor"])
+    permission(["Doctor"], "role")
 
     prescribe_form = PrescribeForm(request.form)
 
@@ -1088,7 +1098,7 @@ def prescribe():
 
 @app.route('/addToCart', methods=['POST'])
 def addPrescription():
-    permission(["Patient"])
+    permission(["Patient"], "role")
 
     db = shelve.open('storage.db', 'c')
     cart_dict = db['Cart']
@@ -1121,7 +1131,7 @@ def addPrescription():
 # Admin access
 @app.route('/all_users')
 def admin_all_users():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM users')
@@ -1132,7 +1142,7 @@ def admin_all_users():
 
 @app.route('/admin_update/<uid>', methods=["GET", "POST"])
 def admin_update(uid):
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     db = shelve.open("storage.db")
     form = AdminUpdateForm(request.form)
@@ -1159,7 +1169,7 @@ def admin_update(uid):
 
 @app.route('/admin_delete/<uid>', methods=["GET"])
 def admin_delete(uid):
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('DELETE * FROM users WHERE NRIC = %s', (uid,))
@@ -1169,7 +1179,7 @@ def admin_delete(uid):
 
 @app.route('/add_doctor', methods=["GET", "POST"])
 def add_doctor():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     form = RegisterForm(request.form)
     if request.method == "POST" and form.validate():
@@ -1195,7 +1205,7 @@ def add_doctor():
 
 @app.route("/show_pyecharts1")
 def showechart1():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     user_count = {'Patients': 0, "Doctors": 0}
     xdata = []
@@ -1215,7 +1225,7 @@ def showechart1():
 # AppointmentSystem
 @app.route('/appointment_list')
 def appointment():
-    permission(["Patient", "Doctor", "Admin"])
+    permission(["Patient", "Doctor", "Admin"], "role")
 
     db = shelve.open('storage.db', 'c')
     appointment_dict = db['Appointments']
@@ -1258,7 +1268,7 @@ def appointment():
 
 @app.route('/appointment_history')
 def appointment_hist():
-    permission(["Patient", "Doctor", "Admin"])
+    permission(["Patient", "Doctor", "Admin"], "role")
 
     db = shelve.open('storage.db', 'c')
     appointment_dict = db['Appointments']
@@ -1283,7 +1293,7 @@ def appointment_hist():
 
 @app.route('/appointment_summary')
 def appointment_summary():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     global current_month
     db = shelve.open('storage.db', 'c')
@@ -1322,7 +1332,7 @@ def appointment_summary():
 
 @app.route("/show_pyecharts")
 def showechart():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     db = shelve.open('storage.db', 'c')
     appointment_dict = db['Appointments']
@@ -1362,7 +1372,7 @@ def showechart():
 
 @app.route('/appointment', methods=['GET', 'POST'])
 def add_appointment():
-    permission(["Patient"])
+    permission(["Patient"], "role")
 
     form = AppointmentForm(request.form)
     if request.method == "POST" and form.validate():
@@ -1392,7 +1402,7 @@ def add_appointment():
 
 @app.route('/docappointment', methods=['GET', 'POST'])
 def doc_add_appointment():
-    permission(["Doctor"])
+    permission(["Doctor"], "role")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM users WHERE role = "patient"')
@@ -1432,7 +1442,7 @@ def doc_add_appointment():
 
 @app.route('/Updateappointment/<id>', methods=['GET', 'POST'])
 def update_appointment(id):
-    permission(["Patient", "Doctor"])
+    permission(["Patient", "Doctor"], "role")
 
     form = AppointmentForm(request.form)
     if request.method == "POST" and form.validate():
@@ -1476,7 +1486,7 @@ def update_appointment(id):
 
 @app.route('/deleteAppointment/<id>', methods=['POST'])
 def delete_appointment(id):
-    permission(["Patient", "Doctor"])
+    permission(["Patient", "Doctor"], "role")
 
     db = shelve.open('storage.db', 'w')
     appointment_dict = db['Appointments']
@@ -1556,7 +1566,7 @@ def contactus():
 # FAQ
 @app.route('/faq', methods=['GET', 'POST'])
 def create_faq():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     create_faq_form = FAQ(request.form)
     if request.method == 'POST' and create_faq_form.validate():
@@ -1607,7 +1617,7 @@ def retrieve_qns():
 
 @app.route('/updateQns/<int:id>/', methods=['GET', 'POST'])
 def update_qns(id):
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     update_faq_form = FAQ(request.form)
     if request.method == 'POST' and update_faq_form.validate():
@@ -1638,7 +1648,7 @@ def update_qns(id):
 
 @app.route('/deleteQns/<int:id>', methods=['POST'])
 def delete_qns(id):
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     db = shelve.open('storage.db', 'w')
     qn_dict = db['FAQ']
@@ -1653,7 +1663,7 @@ def delete_qns(id):
 
 @app.route("/monthlyQn")
 def monthly_qn():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     db = shelve.open('storage.db', 'c')
     faq_dict = db['FAQ']
@@ -1706,7 +1716,7 @@ def monthly_qn():
 # Application Form
 @app.route('/createApplicant', methods=['GET', 'POST'])
 def create_applicant():
-    permission(["Patient", "NULL"])
+    permission(["Patient", "NULL"], "role")
 
     create_applicant_form = CreateApplicationForm(request.form)
 
@@ -1751,7 +1761,7 @@ def create_applicant():
 
 @app.route('/retrieveApplicants')
 def retrieve_applicants():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     db = shelve.open('storage.db', 'r')
     applicants_dict = db['Applicant']
@@ -1769,7 +1779,7 @@ def retrieve_applicants():
 
 @app.route('/updateApplicants/<int:id>/', methods=['GET', 'POST'])
 def update_applicants(id):
-    permission(["Patient", "NULL"])
+    permission(["Patient", "NULL"], "role")
 
     update_applicant_form = CreateApplicationForm(request.form)
     if request.method == 'POST' and update_applicant_form.validate():
@@ -1849,7 +1859,7 @@ def update_applicants(id):
 
 @app.route('/sendApplicants/<int:id>/', methods=['GET', 'POST'])
 def send_applicant(id):
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     resend_form = ResendForm(request.form)
     contents = "Hello, Please Resend Your Application Form as there is a certain problem with your inputs. The following inputs with problem are, "
@@ -1928,7 +1938,7 @@ def send_applicant(id):
 
 @app.route('/deleteApplicant/<int:id>', methods=['POST'])
 def delete_applicant(id):
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     db = shelve.open('storage.db', 'w')
     applicants_dict = db['Applicant']
@@ -1943,7 +1953,7 @@ def delete_applicant(id):
 
 @app.route('/showDashboard')
 def show_dashboard():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     db = shelve.open('storage.db', 'c')
     applicants_dict = db['Applicant']
@@ -1986,7 +1996,7 @@ def show_dashboard():
 
 @app.route('/showDashboard2')
 def show_dashboard2():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     db = shelve.open('storage.db', 'c')
     applicants_dict = db['Applicant']
@@ -2074,7 +2084,7 @@ def show_dashboard2():
 
 @app.route('/showDashboard3')
 def show_dashboard3():
-    permission(["Admin"])
+    permission(["Admin"], "role")
 
     db = shelve.open('storage.db', 'c')
     applicants_dict = db['Applicant']
