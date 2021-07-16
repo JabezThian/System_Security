@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Nanyang Polyclinic - Shopping Cart{% endblock %}
+{% block title %}Nanyang Polyclinic - Purchase History{% endblock %}
 
 {% block content %}
 {% from "includes/_formHelper.html" import render_field %}
@@ -17,7 +17,7 @@
     {% if session['user-role'] == "Admin" %}
       <a class="create-button" href="/createItem"> + </a>
       <a class="inventory-button" href="/inventory"> i </a>
-        <a class="dashboard-button" href="/dashboard"><img class="dashboard-img" src="https://cdn4.iconfinder.com/data/icons/tupix-1/30/graph-512.png"></a>
+        <a class="dashboard-button" href="/pharmacy/dashboard"><img class="dashboard-img" src="https://cdn4.iconfinder.com/data/icons/tupix-1/30/graph-512.png"></a>
     {% endif %}
   {% endif %}
 </div>
@@ -65,4 +65,3 @@
   </form>
 </div>
 {% endblock %}
-
