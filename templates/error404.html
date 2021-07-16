@@ -1,21 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Page Not Found{% endblock %}
-{% block head %}
-    <!-- Google font -->
-    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700,900" rel="stylesheet">
-    <!-- Custom stylesheet -->
-    <link type="text/css" rel="stylesheet" href="{{url_for('static', filename='css/style.css')}}">
-{% endblock %}
 
-{% block navbar %}{% endblock %}
 
 {% block content %}
-    <div id="notfound">
-        <div class="notfound">
-            <div class="notfound-404">
-                <h1>Oops!</h1>
-            </div>
+    <div class="notfound">
+        <div class="oops">
+            <h1>Oops!</h1>
             <h2>404 - Page not found</h2>
+        </div>
+        <div class="image">
+            <img src="https://media1.tenor.com/images/ff7156df530dc50f32c5b9870e42f40b/tenor.gif?itemid=12450274" height="200px">
+        </div>
+        <div class="description">
             <p>The page you are looking for might have been removed had its name changed or is temporarily unavailable.</p>
             <a href="{{url_for('home')}}">Go To Homepage</a>
         </div>
