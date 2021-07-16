@@ -1,7 +1,7 @@
 import smtplib
 from datetime import datetime
 
-from flask import Flask, render_template, redirect, url_for, request, flash, session
+from flask import Flask, render_template, redirect, url_for, request, flash, session, abort
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
 from flask_mysqldb import MySQL
@@ -16,11 +16,9 @@ import qns
 import shelve
 from Forms import *
 from pyechart import bargraph, applicationbargraph, addressbargraph, agerangebargraph, monthlyQnbargraph, usernumber
-from flask_recaptcha import ReCaptcha   # Edited by Jabez (pip install Flask-reCaptcha)
+from flask_recaptcha import ReCaptcha
 
 app = Flask(__name__, static_url_path='/static')
-# Edited by Jabez (Start)
-recaptcha = ReCaptcha(app=app)
 
 app.config.update(dict(
     RECAPTCHA_ENABLED=True,
@@ -31,7 +29,6 @@ app.config.update(dict(
 recaptcha = ReCaptcha()
 recaptcha.init_app(app)
 app.config["SECRET_KEY"] = b'o5Dg987*&G^@(E&FW)}'
-# Edited by Jabez (End)
 
 # Email Server
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
@@ -44,7 +41,7 @@ app.config["DEFAULT_MAIL_SENDER"] = "nanyanghospital2021@gmail.com"
 # SQL Server
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'password'
+app.config['MYSQL_PASSWORD'] = 'FeioyFTW_GSA'
 app.config['MYSQL_DB'] = 'nanyang_login'
 
 # Initialize MySQL
@@ -57,6 +54,15 @@ def do_something_once_only():
     session['attempt'] = 0
 
 
+def permission(perm):
+    try:
+        if session['user-role'] not in perm:
+            return abort(404)
+    except KeyError:
+        if 'NULL' not in perm:
+            return abort(404)
+
+
 @app.route('/')
 def home():
     return render_template('home.html')
@@ -65,6 +71,8 @@ def home():
 # Register system
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    permission(['NULL']) # melvin
+
     form = RegisterForm(request.form)
     if request.method == "POST" and form.validate():
         NRIC = form.NRIC.data
@@ -94,6 +102,8 @@ def register():
 # Login system
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    permission(['NULL'])
+
     form = LoginForm(request.form)
     attempt = session['attempt']
     if request.method == "POST" and form.validate():
@@ -135,7 +145,7 @@ def login():
                     mysql.connection.commit()  # Edited by Jabez
             else:
                 print('Error ReCaptcha')
-        else:   # When attempt is not more than 3
+        else:  # When attempt is not more than 3
             if account:
                 # resetting the attempts back to 0
                 cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
@@ -163,6 +173,8 @@ def login():
 # Logout system
 @app.route("/logout")
 def logout():
+    permission(["Patient", "Doctor", "Admin"])
+
     session.pop("user", None)
     session.pop("user-NRIC", None)
     session.pop("user-role", None)
@@ -172,6 +184,8 @@ def logout():
 # Profile System
 @app.route('/profile', methods=["GET", "POST"])
 def profile():
+    permission(["Patient", "Doctor", "Admin"])
+
     form = UpdateProfileForm(request.form)
 
     NRIC = session["user-NRIC"]
@@ -190,9 +204,12 @@ def profile():
     return render_template("Login/profile.html", form=form, user=user)
 
 
+
 # User password management
 @app.route('/change_password', methods=["GET", "POST"])
 def change_password():
+    permission(["Patient", "Doctor", "Admin"])
+
     form = ChangePasswordForm(request.form)
 
     NRIC = session["user-NRIC"]
@@ -228,6 +245,7 @@ def confirm_token(token, expiration=300):
 
 @app.route('/reset_password', methods=["GET", "POST"])
 def reset_password():
+
     form = ResetPasswordForm(request.form)
 
     if request.method == "POST" and form.validate():
@@ -424,6 +442,8 @@ def show_new():
 
 @app.route('/purchaseHistory', methods=['GET', 'POST'])
 def purchaseHistory():
+    permission(["Patient", "Doctor", "Admin"])
+
     search = SearchBar(request.form)
     user_id = session["user-NRIC"]
 
@@ -484,8 +504,10 @@ def purchaseHistory():
     return render_template('Pharmacy/purchaseHistory.html', form=search, cart_list=cart_list)
 
 
-@app.route('/dashboard', methods=['GET'])
+@app.route('/pharmacy/dashboard', methods=['GET'])
 def dashboard():
+    permission(["Admin"])
+
     total_sales = int()
     general_list = list()
     general_low_list = list()
@@ -548,6 +570,8 @@ def dashboard():
 # CRUD Items
 @app.route('/createItem', methods=['GET', 'POST'])
 def create_item():
+    permission(['Admin']) # melvin
+
     create_item_form = CreateItemForm(request.form)
     if request.method == 'POST' and create_item_form.validate():
         item_dict = {}
@@ -579,6 +603,8 @@ def create_item():
 
 @app.route('/inventory')
 def inventory():
+    permission(["Admin"]) # melvin
+
     db = shelve.open('storage.db', 'r')
     item_dict = db['Items']
     db.close()
@@ -593,6 +619,8 @@ def inventory():
 
 @app.route('/updateItem/<int:id>/', methods=['GET', 'POST'])
 def update_item(id):
+    permission(["Admin"]) # melvin
+
     update_item_form = CreateItemForm(request.form)
 
     if request.method == 'POST' and update_item_form.validate():
@@ -627,6 +655,8 @@ def update_item(id):
 
 @app.route('/deleteItem/<int:id>', methods=['POST'])
 def delete_item(id):
+    permission(["Admin"]) # melvin
+
     db = shelve.open('storage.db', 'w')
     item_dict = db['Items']
 
@@ -641,6 +671,8 @@ def delete_item(id):
 # CRUD Shopping Cart
 @app.route('/purchaseItem/<int:id>/', methods=['GET', 'POST'])
 def buy_item(id):
+    permission(["Admin"]) # melvin
+
     buy_item_form = BuyItemForm(request.form)
 
     if request.method == 'POST' and buy_item_form.validate():
@@ -878,6 +910,8 @@ def paid():
 # CRUD Prescription
 @app.route('/prescription', methods=['GET', 'POST'])
 def prescription():
+    permission(["Patient", "Doctor"])
+
     search = SearchBar(request.form)
     if request.method == 'POST':
         db = shelve.open('storage.db', 'r')
@@ -914,6 +948,8 @@ def prescription():
 
 @app.route('/prescribeItem/<int:id>/', methods=['GET', 'POST'])
 def prescribe_item(id):
+    permission(["Patient", "Doctor"])
+
     prescribe_item_form = PrescriptionForm(request.form)
 
     if request.method == 'POST' and prescribe_item_form.validate():
@@ -971,6 +1007,8 @@ def prescribe_item(id):
 
 @app.route('/prescription/prescribe', methods=['GET', 'POST'])
 def prescription_cart():
+    permission(["Patient", "Doctor"])
+
     search = SearchBar(request.form)
     if request.method == 'POST':
         db = shelve.open('storage.db', 'r')
@@ -1023,6 +1061,8 @@ def prescription_cart():
 
 @app.route('/prescribe', methods=['GET', 'POST'])
 def prescribe():
+    permission(["Doctor"])
+
     prescribe_form = PrescribeForm(request.form)
 
     if request.method == 'POST' and prescribe_form.validate():
@@ -1048,6 +1088,8 @@ def prescribe():
 
 @app.route('/addToCart', methods=['POST'])
 def addPrescription():
+    permission(["Patient"])
+
     db = shelve.open('storage.db', 'c')
     cart_dict = db['Cart']
     pres_dict = db['Prescription']
@@ -1079,88 +1121,82 @@ def addPrescription():
 # Admin access
 @app.route('/all_users')
 def admin_all_users():
-    if session["user-role"] == "Admin":
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM users')
-        all_users = cursor.fetchall()
+    permission(["Admin"])
 
-        return render_template("Admin/all_users.html", all_users=all_users)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('SELECT * FROM users')
+    all_users = cursor.fetchall()
 
-    flash("Access denied", "danger")
-    return redirect(url_for('home'))
+    return render_template("Admin/all_users.html", all_users=all_users)
 
 
 @app.route('/admin_update/<uid>', methods=["GET", "POST"])
 def admin_update(uid):
-    if session["user-role"] == "Admin":
-        db = shelve.open("storage.db")
-        form = AdminUpdateForm(request.form)
+    permission(["Admin"])
 
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM users WHERE NRIC = %s', (uid,))
+    db = shelve.open("storage.db")
+    form = AdminUpdateForm(request.form)
 
-        user = cursor.fetchone()
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('SELECT * FROM users WHERE NRIC = %s', (uid,))
 
-        if request.method == "POST" and form.validate():
-            cursor.execute('UPDATE users SET email = %s, password = %s, url = %s WHERE NRIC = %s',
-                           (form.Email.data, form.Password.data, form.URL.data, uid,))
-            appointment_dict = db['Appointments']
-            for appts in appointment_dict:
-                print(appointment_dict[appts])
-                if appointment_dict[appts].get_doctor() == user["fname"] + " " + user["lname"]:
-                    appointment_dict[appts].set_url(user["url"])
-            flash("Successfully updated", "success")
-            db.close()
-            return redirect(url_for("admin_all_users"))
+    user = cursor.fetchone()
 
-        return render_template("Admin/admin_update.html", user=user, form=form)
+    if request.method == "POST" and form.validate():
+        cursor.execute('UPDATE users SET email = %s, password = %s, url = %s WHERE NRIC = %s',
+                       (form.Email.data, form.Password.data, form.URL.data, uid,))
+        appointment_dict = db['Appointments']
+        for appts in appointment_dict:
+            print(appointment_dict[appts])
+            if appointment_dict[appts].get_doctor() == user["fname"] + " " + user["lname"]:
+                appointment_dict[appts].set_url(user["url"])
+        flash("Successfully updated", "success")
+        db.close()
+        return redirect(url_for("admin_all_users"))
 
-    else:
-        flash("Access denied", "danger")
-        return redirect(url_for("home"))
+    return render_template("Admin/admin_update.html", user=user, form=form)
 
 
 @app.route('/admin_delete/<uid>', methods=["GET"])
 def admin_delete(uid):
-    if session["user-role"] == "Admin":
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('DELETE * FROM users WHERE NRIC = %s', (uid,))
-        flash("Successfully deleted user", "success")
-        return redirect(url_for('admin_all_users'))
-    else:
-        flash("Access denied", "danger")
-        return redirect(url_for('home'))
+    permission(["Admin"])
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('DELETE * FROM users WHERE NRIC = %s', (uid,))
+    flash("Successfully deleted user", "success")
+    return redirect(url_for('admin_all_users'))
 
 
 @app.route('/add_doctor', methods=["GET", "POST"])
 def add_doctor():
-    if session["user-role"] == "Admin":
-        form = RegisterForm(request.form)
-        if request.method == "POST" and form.validate():
-            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-            cursor.execute('SELECT * FROM users WHERE nric = %s', (form.NRIC.data,))
-            user_exist = cursor.fetchone()
+    permission(["Admin"])
 
-            if user_exist:
-                flash("This NRIC is already in used.You can login to access our service.", "danger")
-                return redirect(url_for('admin_all_users'))
-            else:
-                cursor.execute('INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role, specialization, url) '
-                               'VALUES (%s, %s, %s, %s, %s, %s, %s, "Doctor", %s, %s)',
-                               (form.NRIC.data, form.FirstName.data, form.LastName.data, form.Gender.data,
-                                form.Dob.data, form.Email.data, form.Password.data, form.specialization.data,
-                                form.URL.data))
-                mysql.connection.commit()
-                flash(f'Account created for {form.FirstName.data} {form.LastName.data}!', 'success')
-                return redirect(url_for('admin_all_users'))
-        return render_template("Admin/add_doctor.html", form=form)
-    else:
-        flash("Access denied", "danger")
-        return redirect(url_for('home'))
+    form = RegisterForm(request.form)
+    if request.method == "POST" and form.validate():
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT * FROM users WHERE nric = %s', (form.NRIC.data,))
+        user_exist = cursor.fetchone()
+
+        if user_exist:
+            flash("This NRIC is already in used.You can login to access our service.", "danger")
+            return redirect(url_for('admin_all_users'))
+        else:
+            cursor.execute(
+                'INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role, specialization, url) '
+                'VALUES (%s, %s, %s, %s, %s, %s, %s, "Doctor", %s, %s)',
+                (form.NRIC.data, form.FirstName.data, form.LastName.data, form.Gender.data,
+                 form.Dob.data, form.Email.data, form.Password.data, form.specialization.data,
+                 form.URL.data))
+            mysql.connection.commit()
+            flash(f'Account created for {form.FirstName.data} {form.LastName.data}!', 'success')
+            return redirect(url_for('admin_all_users'))
+    return render_template("Admin/add_doctor.html", form=form)
 
 
 @app.route("/show_pyecharts1")
 def showechart1():
+    permission(["Admin"])
+
     user_count = {'Patients': 0, "Doctors": 0}
     xdata = []
     ydata = []
@@ -1179,6 +1215,8 @@ def showechart1():
 # AppointmentSystem
 @app.route('/appointment_list')
 def appointment():
+    permission(["Patient", "Doctor", "Admin"])
+
     db = shelve.open('storage.db', 'c')
     appointment_dict = db['Appointments']
     appointment_list = []
@@ -1220,6 +1258,8 @@ def appointment():
 
 @app.route('/appointment_history')
 def appointment_hist():
+    permission(["Patient", "Doctor", "Admin"])
+
     db = shelve.open('storage.db', 'c')
     appointment_dict = db['Appointments']
     appointment_list = []
@@ -1243,6 +1283,8 @@ def appointment_hist():
 
 @app.route('/appointment_summary')
 def appointment_summary():
+    permission(["Admin"])
+
     global current_month
     db = shelve.open('storage.db', 'c')
     appointment_dict = db['Appointments']
@@ -1280,6 +1322,8 @@ def appointment_summary():
 
 @app.route("/show_pyecharts")
 def showechart():
+    permission(["Admin"])
+
     db = shelve.open('storage.db', 'c')
     appointment_dict = db['Appointments']
     appointment_list = []
@@ -1318,6 +1362,8 @@ def showechart():
 
 @app.route('/appointment', methods=['GET', 'POST'])
 def add_appointment():
+    permission(["Patient"])
+
     form = AppointmentForm(request.form)
     if request.method == "POST" and form.validate():
         db = shelve.open('storage.db', 'c')
@@ -1346,6 +1392,8 @@ def add_appointment():
 
 @app.route('/docappointment', methods=['GET', 'POST'])
 def doc_add_appointment():
+    permission(["Doctor"])
+
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM users WHERE role = "patient"')
 
@@ -1384,6 +1432,8 @@ def doc_add_appointment():
 
 @app.route('/Updateappointment/<id>', methods=['GET', 'POST'])
 def update_appointment(id):
+    permission(["Patient", "Doctor"])
+
     form = AppointmentForm(request.form)
     if request.method == "POST" and form.validate():
         db = shelve.open('storage.db', 'c')
@@ -1426,6 +1476,8 @@ def update_appointment(id):
 
 @app.route('/deleteAppointment/<id>', methods=['POST'])
 def delete_appointment(id):
+    permission(["Patient", "Doctor"])
+
     db = shelve.open('storage.db', 'w')
     appointment_dict = db['Appointments']
     appointment_dict.pop(int(id))
@@ -1479,7 +1531,6 @@ def assignDoctor(appointment):
                 break
 
 
-
 # Contact Us
 @app.route('/contactus', methods=['GET', 'POST'])
 def contactus():
@@ -1505,6 +1556,8 @@ def contactus():
 # FAQ
 @app.route('/faq', methods=['GET', 'POST'])
 def create_faq():
+    permission(["Admin"])
+
     create_faq_form = FAQ(request.form)
     if request.method == 'POST' and create_faq_form.validate():
         qn_dict = {}
@@ -1554,6 +1607,8 @@ def retrieve_qns():
 
 @app.route('/updateQns/<int:id>/', methods=['GET', 'POST'])
 def update_qns(id):
+    permission(["Admin"])
+
     update_faq_form = FAQ(request.form)
     if request.method == 'POST' and update_faq_form.validate():
         db = shelve.open('storage.db', 'w')
@@ -1583,7 +1638,8 @@ def update_qns(id):
 
 @app.route('/deleteQns/<int:id>', methods=['POST'])
 def delete_qns(id):
-    qn_dict = {}
+    permission(["Admin"])
+
     db = shelve.open('storage.db', 'w')
     qn_dict = db['FAQ']
 
@@ -1597,6 +1653,8 @@ def delete_qns(id):
 
 @app.route("/monthlyQn")
 def monthly_qn():
+    permission(["Admin"])
+
     db = shelve.open('storage.db', 'c')
     faq_dict = db['FAQ']
     faq_list = []
@@ -1648,6 +1706,8 @@ def monthly_qn():
 # Application Form
 @app.route('/createApplicant', methods=['GET', 'POST'])
 def create_applicant():
+    permission(["Patient", "NULL"])
+
     create_applicant_form = CreateApplicationForm(request.form)
 
     if request.method == 'POST' and create_applicant_form.validate():
@@ -1673,32 +1733,26 @@ def create_applicant():
 
         applicants_dict[applicant.get_applicantid()] = applicant
 
-        db['Applicant'] = applicants_dict
-
-        # Automatically Send Email Codes
-        sender_email = "nyppolyclinic@gmail.com"
-        password = "helloworld123"
-        rec_email = create_applicant_form.email.data
-        subject = "Application for NYP Polyclinic"
-        body = "Hello, we have received your application. Please wait for a few days for us to update you about the status. Thank you."
-        message = "Subject: {}\n\n{}".format(subject, body)
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender_email, password)
-        print("Login Success")
-        server.sendmail(sender_email, rec_email, message)
-        print("Email has been sent to ", rec_email)
-        # Automatically Send Email Codes
-
         db.close()
 
-        session['applicant_created'] = applicant.get_first_name() + ' ' + applicant.get_last_name()
-        return redirect(url_for('create_applicant'))
+        # Automatically Send Email Codes
+        msg = Message(subject='Application for NYP Polyclinic',
+                      sender=app.config.get("MAIL_USERNAME"),
+                      recipients=[create_applicant_form.email.data],
+                      body="Hello, we have received your application. Please wait for a few days for us to update you "
+                           "about the status. Thank you.")
+
+        mail.send(msg)
+
+        flash('Application Recieved, an email has been sent to your email address!', 'success')
+        return redirect(url_for('home'))
     return render_template('ApplicationForm/applicationForm.html', form=create_applicant_form)
 
 
 @app.route('/retrieveApplicants')
 def retrieve_applicants():
+    permission(["Admin"])
+
     db = shelve.open('storage.db', 'r')
     applicants_dict = db['Applicant']
     db.close()
@@ -1715,6 +1769,8 @@ def retrieve_applicants():
 
 @app.route('/updateApplicants/<int:id>/', methods=['GET', 'POST'])
 def update_applicants(id):
+    permission(["Patient", "NULL"])
+
     update_applicant_form = CreateApplicationForm(request.form)
     if request.method == 'POST' and update_applicant_form.validate():
 
@@ -1793,6 +1849,8 @@ def update_applicants(id):
 
 @app.route('/sendApplicants/<int:id>/', methods=['GET', 'POST'])
 def send_applicant(id):
+    permission(["Admin"])
+
     resend_form = ResendForm(request.form)
     contents = "Hello, Please Resend Your Application Form as there is a certain problem with your inputs. The following inputs with problem are, "
     if request.method == 'POST' and resend_form.validate():
@@ -1870,6 +1928,8 @@ def send_applicant(id):
 
 @app.route('/deleteApplicant/<int:id>', methods=['POST'])
 def delete_applicant(id):
+    permission(["Admin"])
+
     db = shelve.open('storage.db', 'w')
     applicants_dict = db['Applicant']
 
@@ -1883,6 +1943,8 @@ def delete_applicant(id):
 
 @app.route('/showDashboard')
 def show_dashboard():
+    permission(["Admin"])
+
     db = shelve.open('storage.db', 'c')
     applicants_dict = db['Applicant']
     applicants_list = []
@@ -1924,6 +1986,8 @@ def show_dashboard():
 
 @app.route('/showDashboard2')
 def show_dashboard2():
+    permission(["Admin"])
+
     db = shelve.open('storage.db', 'c')
     applicants_dict = db['Applicant']
     applicants_list = []
@@ -2010,6 +2074,8 @@ def show_dashboard2():
 
 @app.route('/showDashboard3')
 def show_dashboard3():
+    permission(["Admin"])
+
     db = shelve.open('storage.db', 'c')
     applicants_dict = db['Applicant']
     applicants_list = []
