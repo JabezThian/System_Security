@@ -1,4 +1,3 @@
-import smtplib
 from datetime import datetime
 
 from flask import Flask, render_template, redirect, url_for, request, flash, session, abort
@@ -66,7 +65,7 @@ def permission(perm, key):
 
     except KeyError:
         if 'NULL' not in perm:
-                return abort(404)
+            return abort(404)
 
 
 @app.route('/')
@@ -119,7 +118,7 @@ def login():
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('SELECT * FROM users WHERE NRIC = %s AND password = %s', (NRIC, password))
         account = cursor.fetchone()
-        # Edited by Jabez (start)
+
         cursor.execute('SELECT NRIC, attempt FROM users WHERE NRIC = %s', (NRIC,))
         attempt_dict = cursor.fetchone()
         # Check if user is real and user's attempt is more than 5
@@ -130,7 +129,7 @@ def login():
                     # do not allow the user to login and flash incorrect password
                     flash('Your account have been locked!', 'danger')
                     # add timer
-                # Edited by Jabez (end)
+
                 elif account:
                     # resetting the attempts back to 0
                     cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
@@ -148,7 +147,7 @@ def login():
                     flash('Incorrect username or password', 'danger')
                     # SQL adding and counting failed attempts
                     cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
-                    mysql.connection.commit()  # Edited by Jabez
+                    mysql.connection.commit()
             else:
                 print('Error ReCaptcha')
         else:  # When attempt is not more than 3
@@ -169,7 +168,7 @@ def login():
                 flash('Incorrect username or password', 'danger')
                 # SQL adding and counting failed attempts
                 cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
-                mysql.connection.commit()  # Edited by Jabez
+                mysql.connection.commit()
                 attempt += 1
                 session['attempt'] = attempt
                 print(attempt)
@@ -201,14 +200,15 @@ def profile():
 
     if request.method == "POST" and form.validate():
         cursor.execute('UPDATE users SET email = %s, dob = %s WHERE NRIC = %s', (form.Email.data, form.Dob.data, NRIC,))
-        mysql.connection.commit()  # Edited by Jabez
-        cursor.execute('SELECT * from users')  # Edited by Jabez
-        account = cursor.fetchone()  # Edited by Jabez
-        session["user"] = account  # Edited by Jabez
-        return redirect(url_for('profile'))  # Edited by Jabez
+        mysql.connection.commit()
+        cursor.execute('SELECT * from users')
+        account = cursor.fetchone()
+        session["user"] = account
+        flash('Profile has been updated!', 'success')
+
+        return redirect(url_for('profile'))
 
     return render_template("Login/profile.html", form=form, user=user)
-
 
 
 # User password management
@@ -224,7 +224,9 @@ def change_password():
 
     if request.method == "POST" and form.validate():
         cursor.execute('UPDATE users SET password = %s WHERE NRIC = %s', (form.Password.data, NRIC,))
-        mysql.connection.commit()  # Edited by Jabez
+        mysql.connection.commit()
+        flash('Password has been changed', 'success')
+
         return redirect(url_for('home'))
 
     return render_template('Login/change_password.html', form=form)
@@ -251,7 +253,6 @@ def confirm_token(token, expiration=300):
 
 @app.route('/reset_password', methods=["GET", "POST"])
 def reset_password():
-
     form = ResetPasswordForm(request.form)
 
     if request.method == "POST" and form.validate():
@@ -285,7 +286,7 @@ def confirm_reset(token):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     if request.method == "POST" and form.validate():
         cursor.execute('UPDATE users SET password = %s WHERE NRIC = %s', (form.Password.data, NRIC,))
-        mysql.connection.commit()  # Edited by Jabez
+        mysql.connection.commit()
         flash("Successfully reset password", "success")
         return redirect(url_for("login"))
 
@@ -466,6 +467,7 @@ def purchaseHistory():
                     cart_list.append(cart)
 
             return render_template('Pharmacy/purchaseHistory.html', form=search, cart_list=cart_list)
+
         elif sort_amount is not None:
             db = shelve.open('storage.db', 'c')
             cart_dict = db['Paid']
@@ -603,7 +605,9 @@ def create_item():
 
         db.close()
 
+        flash("Item has been successfully created!", "success")
         return redirect(url_for('inventory'))
+
     return render_template('Pharmacy/createItem.html', form=create_item_form)
 
 
@@ -643,6 +647,8 @@ def update_item(id):
         db['Items'] = item_dict
         db.close()
 
+        flash("Item has been successfully updated!", "success")
+
         return redirect(url_for('inventory'))
     else:
         db = shelve.open('storage.db', 'r')
@@ -671,14 +677,14 @@ def delete_item(id):
     db['Items'] = item_dict
     db.close()
 
+    flash("Item has been successfully deleted!", "success")
+
     return redirect(url_for('inventory'))
 
 
 # CRUD Shopping Cart
 @app.route('/purchaseItem/<int:id>/', methods=['GET', 'POST'])
 def buy_item(id):
-    permission(["Admin"], "role")
-
     buy_item_form = BuyItemForm(request.form)
 
     if request.method == 'POST' and buy_item_form.validate():
@@ -713,6 +719,7 @@ def buy_item(id):
             db['Cart'] = cart_dict
             db['Items'] = item_dict
             db.close()
+            flash("Item has been successfully added to cart!", "success")
 
         return redirect(url_for('show_items'))
 
@@ -780,7 +787,6 @@ def shopping_cart():
 
 @app.route('/shoppingCart/<int:id>', methods=['GET', 'POST'])
 def specific_cart(id):
-
     search = SearchBar(request.form)
     if request.method == 'POST':
         db = shelve.open('storage.db', 'r')
@@ -871,6 +877,8 @@ def checkout():
                               paid.get_id()))
             mail.send(msg)
 
+            flash("A receipt has been sent to your email!", "success")
+
             return redirect(url_for('paid'))
     return render_template('Pharmacy/checkout.html', form=checkout_form)
 
@@ -893,6 +901,8 @@ def remove_item(id):
     db['Cart'] = cart_dict
     db.close()
 
+    flash("Item has been successfully removed!", "success")
+
     return redirect(url_for('shopping_cart'))
 
 
@@ -908,6 +918,8 @@ def clear_cart():
 
     db['Cart'] = cart_dict
     db.close()
+
+    flash("Cart has been successfully cleared!", "success")
 
     return redirect(url_for('shopping_cart'))
 
@@ -1000,6 +1012,8 @@ def prescribe_item(id):
             db['Prescription'] = pres_dict
             db.close()
 
+            flash("Item has added to cart", "success")
+
         return redirect(url_for('prescription'))
 
     else:
@@ -1091,6 +1105,8 @@ def prescribe():
 
         db['Prescription'] = pres_dict
         db.close()
+
+        flash("Prescription has been sent successfully", "success")
         return redirect(url_for('prescription'))
     else:
         return render_template('Pharmacy/prescribe.html', form=prescribe_form)
@@ -1124,6 +1140,8 @@ def addPrescription():
 
     db['Cart'] = cart_dict
     db.close()
+
+    flash("Prescription has been added to cart", "success")
 
     return redirect(url_for('shopping_cart'))
 
@@ -1583,6 +1601,7 @@ def create_faq():
 
         db.close()
 
+        flash("FAQ has been created", "success")
         return redirect(url_for('create_faq'))
     return render_template('FAQ/faq.html', form=create_faq_form)
 
@@ -1632,6 +1651,7 @@ def update_qns(id):
         db['FAQ'] = qn_dict
         db.close()
 
+        flash("FAQ has been updated", "success")
         return redirect(url_for('retrieve_qns'))
     else:
         db = shelve.open('storage.db', 'r')
@@ -1658,6 +1678,7 @@ def delete_qns(id):
     db['FAQ'] = qn_dict
     db.close()
 
+    flash("FAQ has been deleted", "success")
     return redirect(url_for('retrieve_qns'))
 
 
@@ -1743,6 +1764,7 @@ def create_applicant():
 
         applicants_dict[applicant.get_applicantid()] = applicant
 
+        db["Applicant"] = applicants_dict
         db.close()
 
         # Automatically Send Email Codes
@@ -1754,7 +1776,7 @@ def create_applicant():
 
         mail.send(msg)
 
-        flash('Application Recieved, an email has been sent to your email address!', 'success')
+        flash('Application received, an email has been sent to your email address!', 'success')
         return redirect(url_for('home'))
     return render_template('ApplicationForm/applicationForm.html', form=create_applicant_form)
 
@@ -1779,8 +1801,6 @@ def retrieve_applicants():
 
 @app.route('/updateApplicants/<int:id>/', methods=['GET', 'POST'])
 def update_applicants(id):
-    permission(["Patient", "NULL"], "role")
-
     update_applicant_form = CreateApplicationForm(request.form)
     if request.method == 'POST' and update_applicant_form.validate():
 
@@ -1806,26 +1826,20 @@ def update_applicants(id):
         applicant.set_postion1(update_applicant_form.posi1.data)
         applicant.set_company2(update_applicant_form.comp2.data)
         applicant.set_postion2(update_applicant_form.posi2.data)
+
         db['Applicant'] = applicants_dict
-
-        # Automatically Send Email Codes
-        sender_email = "nyppolyclinic@gmail.com"
-        password = "helloworld123"
-        rec_email = applicant.get_email()
-        subject = "Application for NYP Polyclinic"
-        body = "Hello, we have your updated application. Please wait for a few days for us to update you about the status. Thank you."
-        message = "Subject: {}\n\n{}".format(subject, body)
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender_email, password)
-        print("Login Success")
-        server.sendmail(sender_email, rec_email, message)
-        print("Email has been sent to ", rec_email)
-        # Automatically Send Email Codes
-
         db.close()
 
-        session['applicant_updated'] = applicant.get_first_name() + ' ' + applicant.get_last_name()
+        # Automatically Send Email Codes
+        msg = Message(subject='Application for NYP Polyclinic',
+                      sender=app.config.get("MAIL_USERNAME"),
+                      recipients=[update_applicant_form.email.data],
+                      body="Hello, we have your updated application. Please wait for a few days for us to update you "
+                           "about the status. Thank you.")
+
+        mail.send(msg)
+
+        flash('Application updated, an email has been sent to your email address!', 'success')
 
         return redirect(url_for('home'))
 
@@ -1833,10 +1847,14 @@ def update_applicants(id):
 
         db = shelve.open('storage.db', 'r')
         applicants_dict = db['Applicant']
+        applicant = applicants_dict.get(id)
         db.close()
 
+        permission(["Patient", "Admin"], "role")
+        if session["user-role"] != "Admin":
+            permission([applicant.get_NRIC()], "nric")
+
         # get data input and place in in the field
-        applicant = applicants_dict.get(id)
         update_applicant_form.fname.data = applicant.get_first_name()
         update_applicant_form.lname.data = applicant.get_last_name()
         update_applicant_form.nric.data = applicant.get_NRIC()
@@ -1862,7 +1880,8 @@ def send_applicant(id):
     permission(["Admin"], "role")
 
     resend_form = ResendForm(request.form)
-    contents = "Hello, Please Resend Your Application Form as there is a certain problem with your inputs. The following inputs with problem are, "
+    contents = "Hello, Please Resend Your Application Form as there is a certain problem with your inputs. The " \
+               "following inputs with problem are, "
     if request.method == 'POST' and resend_form.validate():
         db = shelve.open('storage.db', 'r')
         applicants_dict = db['Applicant']
@@ -1917,20 +1936,16 @@ def send_applicant(id):
         else:
             contents = contents
 
-        sender_email = "nyppolyclinic@gmail.com"
-        password = "helloworld123"
-        rec_email = applicant.get_email()
-        subject = "Application for NYP Polyclinic"
-        body = contents + ". Here's the link to update {}{}".format(request.url_root,
-                                                                    url_for('update_applicants', id=id))
-        message = "Subject: {}\n\n{}".format(subject, body)
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender_email, password)
-        print("Login Success")
-        server.sendmail(sender_email, rec_email, message)
-        print("Email has been sent to ", rec_email)
-        print(applicant)
+        msg = Message(subject='Application for NYP Polyclinic',
+                      sender=app.config.get("MAIL_USERNAME"),
+                      recipients=[applicant.get_email()],
+                      body=contents + ". Here's the link to update {}{}".format(request.url_root,
+                                                                    url_for('update_applicants', id=id)))
+
+        mail.send(msg)
+
+        flash('Email has been sent!', 'success')
+
         return redirect(url_for('retrieve_applicants'))
 
     return render_template('ApplicationForm/resendForm.html', form=resend_form)
@@ -1942,12 +1957,13 @@ def delete_applicant(id):
 
     db = shelve.open('storage.db', 'w')
     applicants_dict = db['Applicant']
-
-    applicant = applicants_dict.pop(id)
+    applicants_dict.pop(id)
 
     db['Applicant'] = applicants_dict
     db.close()
-    session['applicant_deleted'] = applicant.get_first_name() + ' ' + applicant.get_last_name()
+
+    flash("Applicant has been removed", "success")
+
     return redirect(url_for('retrieve_applicants'))
 
 
