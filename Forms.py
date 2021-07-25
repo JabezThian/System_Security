@@ -136,7 +136,7 @@ class RegisterForm(Form):
                                                                                                                          'Must contain at least 1 uppercase letter, '
                                                                                                                          'Must contain at least 1 lowercase letter, '
                                                                                                                          'Must contain at least one number, '
-                                                                                                                         'Must contain at least one special character, '), Length(min=8, max=30, message="Invalid Password Length")])
+                                                                                                                         'Must contain at least one special character, '), Length(min=8, max=30, message="Invalid Password Length")]
     Confirm = PasswordField("Confirm Password", [validators.DataRequired(), validators.EqualTo("Password")])
     URL = StringField("URL", [validators.optional()])
     specialization = StringField("Specialization", [validators.optional()])
