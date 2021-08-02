@@ -40,7 +40,7 @@ app.config["DEFAULT_MAIL_SENDER"] = "nanyanghospital2021@gmail.com"
 # SQL Server
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'FeioyFTW_GSA'
+app.config['MYSQL_PASSWORD'] = 'Password'
 app.config['MYSQL_DB'] = 'nanyang_login'
 
 # Initialize MySQL
@@ -80,27 +80,30 @@ def register():
 
     form = RegisterForm(request.form)
     if request.method == "POST" and form.validate():
-        NRIC = form.NRIC.data
-        fname = form.FirstName.data
-        lname = form.LastName.data
-        gender = form.Gender.data
-        dob = form.Dob.data
-        email = form.Email.data
-        password = form.Password.data
+        if recaptcha.verify():
+            NRIC = form.NRIC.data
+            fname = form.FirstName.data
+            lname = form.LastName.data
+            gender = form.Gender.data
+            dob = form.Dob.data
+            email = form.Email.data
+            password = form.Password.data
 
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-        user_exist = cursor.execute('SELECT * FROM users WHERE nric = %s', (NRIC,))
-        if user_exist:
-            flash("This NRIC is already in used. You can login to access our service.", "danger")
-            return redirect(url_for('register'))
+            user_exist = cursor.execute('SELECT * FROM users WHERE nric = %s', (NRIC,))
+            if user_exist:
+                flash("This NRIC is already in used. You can login to access our service.", "danger")
+                return redirect(url_for('register'))
+            else:
+                cursor.execute('INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role, attempt) '
+                               'VALUES (%s, %s, %s, %s, %s, %s, %s, "Patient", 0)',
+                               (NRIC, fname, lname, gender, dob, email, password,))
+                mysql.connection.commit()
+                flash(f'Account created for {form.FirstName.data} {form.LastName.data}!', 'success')
+                return redirect(url_for('login'))
         else:
-            cursor.execute('INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role, attempt) '
-                           'VALUES (%s, %s, %s, %s, %s, %s, %s, "Patient", 0)',
-                           (NRIC, fname, lname, gender, dob, email, password,))
-            mysql.connection.commit()
-            flash(f'Account created for {form.FirstName.data} {form.LastName.data}!', 'success')
-            return redirect(url_for('login'))
+            flash("Please verify reCAPTCHA.", "danger")
     return render_template('Login/register.html', form=form)
 
 
@@ -251,28 +254,29 @@ def confirm_token(token, expiration=300):
     return email
 
 
+# Edited by Jabez (entire route)
 @app.route('/reset_password', methods=["GET", "POST"])
 def reset_password():
     form = ResetPasswordForm(request.form)
 
     if request.method == "POST" and form.validate():
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM users WHERE email = %s', (form.Email.data,))
+        cursor.execute('SELECT * FROM users')
+        SQLemail = cursor.fetchone()
+        if recaptcha.verify():
+            if form.Email.data == SQLemail['email']:
+                token = generate_confirmation_token(form.Email.data)
+                msg = Message(subject="Password reset", recipients=[form.Email.data],
+                              body="Link to reset password : {}{}. Link valid for only 5 minutes" \
+                              .format(request.url_root, url_for("confirm_reset", token=token)),
+                              sender="nanyanghospital2021@gmail.com")
+                mail.send(msg)
 
-        token = generate_confirmation_token(form.Email.data)
-        msg = Message(subject="Password reset", recipients=[form.Email.data],
-                      body="Link to reset password : {}{}. Link valid for only 5 minutes" \
-                      .format(request.url_root, url_for("confirm_reset", token=token)),
-                      sender="nanyanghospital2021@gmail.com")
-        mail.send(msg)
-
-        flash("Successfully entered email, if you have registered an account with us, a reset password email would"
-              " be sent to your email", "success")
-
-        return redirect(url_for("home"))
-
-    else:
-        flash("Email not found! Please register your email.", "danger")
+                flash("Successfully entered email, if you have registered an account with us, a reset password email would be sent to your email", "success")
+            else:
+                flash("Email not found! Please register your email.", "danger")
+        else:
+            flash("Please verify reCAPTCHA.", "danger")
 
     return render_template("Login/reset_password.html", form=form)
 
@@ -1563,21 +1567,24 @@ def assignDoctor(appointment):
 @app.route('/contactus', methods=['GET', 'POST'])
 def contactus():
     form = ContactForm()
-    if form.validate_on_submit():
-        flash(
-            f'You have successfully submitted the form. Please wait 2-3 working days for reply and also check your email.Thank you.',
-            'success')
-        name = request.form['name']
-        email = request.form['email']
-        subject = request.form['subject']
-        enquiries = request.form['enquiries']
-        msg = Message(subject,
-                      sender=app.config.get("MAIL_USERNAME"),
-                      recipients=[email],
-                      body="Hi " + name + ',\n\n Thanks a lot for getting in touch with us. \n \n This is an automatic email just to let you know that we have received your enquiries.\n\n'
-                                          'This is the message that you sent.\n' + enquiries)
-        mail.send(msg)
-        return redirect(url_for('contactus'))
+    if recaptcha.verify():
+        if form.validate_on_submit():
+            flash(
+                f'You have successfully submitted the form. Please wait 2-3 working days for reply and also check your email.Thank you.',
+                'success')
+            name = request.form['name']
+            email = request.form['email']
+            subject = request.form['subject']
+            enquiries = request.form['enquiries']
+            msg = Message(subject,
+                          sender=app.config.get("MAIL_USERNAME"),
+                          recipients=[email],
+                          body="Hi " + name + ',\n\n Thanks a lot for getting in touch with us. \n \n This is an automatic email just to let you know that we have received your enquiries.\n\n'
+                                              'This is the message that you sent.\n' + enquiries)
+            mail.send(msg)
+            return redirect(url_for('contactus'))
+    else:
+        flash("Please verify reCAPTCHA.", "danger")
     return render_template('FAQ/contactus.html', title='Contact Us', form=form)
 
 
@@ -1750,34 +1757,37 @@ def create_applicant():
         except:
             print("Error in retrieving Applicants from storage.db.")
 
-        # parsing parameters into Application Class in Application.py
-        applicant = Applicant.Applicant(create_applicant_form.fname.data, create_applicant_form.lname.data,
-                                        create_applicant_form.nric.data,
-                                        create_applicant_form.email.data, create_applicant_form.age.data,
-                                        create_applicant_form.address.data, create_applicant_form.gender.data,
-                                        create_applicant_form.nationality.data, create_applicant_form.language.data,
-                                        create_applicant_form.phoneno.data, create_applicant_form.quali.data,
-                                        create_applicant_form.industry.data,
-                                        create_applicant_form.comp1.data,
-                                        create_applicant_form.posi1.data, create_applicant_form.comp2.data,
-                                        create_applicant_form.posi2.data)
+        if recaptcha.verify():
+            # parsing parameters into Application Class in Application.py
+            applicant = Applicant.Applicant(create_applicant_form.fname.data, create_applicant_form.lname.data,
+                                            create_applicant_form.nric.data,
+                                            create_applicant_form.email.data, create_applicant_form.age.data,
+                                            create_applicant_form.address.data, create_applicant_form.gender.data,
+                                            create_applicant_form.nationality.data, create_applicant_form.language.data,
+                                            create_applicant_form.phoneno.data, create_applicant_form.quali.data,
+                                            create_applicant_form.industry.data,
+                                            create_applicant_form.comp1.data,
+                                            create_applicant_form.posi1.data, create_applicant_form.comp2.data,
+                                            create_applicant_form.posi2.data)
 
-        applicants_dict[applicant.get_applicantid()] = applicant
+            applicants_dict[applicant.get_applicantid()] = applicant
 
-        db["Applicant"] = applicants_dict
-        db.close()
+            db["Applicant"] = applicants_dict
+            db.close()
 
-        # Automatically Send Email Codes
-        msg = Message(subject='Application for NYP Polyclinic',
-                      sender=app.config.get("MAIL_USERNAME"),
-                      recipients=[create_applicant_form.email.data],
-                      body="Hello, we have received your application. Please wait for a few days for us to update you "
-                           "about the status. Thank you.")
+            # Automatically Send Email Codes
+            msg = Message(subject='Application for NYP Polyclinic',
+                          sender=app.config.get("MAIL_USERNAME"),
+                          recipients=[create_applicant_form.email.data],
+                          body="Hello, we have received your application. Please wait for a few days for us to update you "
+                               "about the status. Thank you.")
 
-        mail.send(msg)
+            mail.send(msg)
 
-        flash('Application received, an email has been sent to your email address!', 'success')
-        return redirect(url_for('home'))
+            flash('Application received, an email has been sent to your email address!', 'success')
+            return redirect(url_for('home'))
+        else:
+            flash("Please verify reCAPTCHA.", "danger")
     return render_template('ApplicationForm/applicationForm.html', form=create_applicant_form)
 
 
