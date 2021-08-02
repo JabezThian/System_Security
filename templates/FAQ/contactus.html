@@ -25,7 +25,9 @@
                 <div class="form-group" id="enquiries">
                     {{ render_field(form.enquiries , class="form-control") }}
                 </div>
-            <input type="submit" value="Submit" class="btn btn-primary">
+                <br/>
+                {{recaptcha }}
+            <input type="submit" value="Submit" class="btn btn-primary" style="margin-top: 10px">
             </fieldset>
         </div>
         </form>
