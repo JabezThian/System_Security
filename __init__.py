@@ -208,7 +208,11 @@ def profile():
         account = cursor.fetchone()
         session["user"] = account
         flash('Profile has been updated!', 'success')
-
+        # Sending email to new Email address
+        msg = Message(subject="Particulars Update", recipients=[form.Email.data],
+                      body="Dear {} {}, \nYour email and Date of Birth have been updated. If this was not you, please contact us @ +65 65553555".format({account['fname'], account['lname']}),
+                      sender="nanyanghospital2021@gmail.com")
+        mail.send(msg)
         return redirect(url_for('profile'))
 
     return render_template("Login/profile.html", form=form, user=user)
