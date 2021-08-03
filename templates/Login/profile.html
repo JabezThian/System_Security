@@ -244,9 +244,8 @@ p {
     <a style="font-size:7em;margin-top:5px;margin-left:90px;">
         <i class="fa fa-fw fa-user fa-30px"></i>
     </a>
-    <h1> Hi! </h1>
-    <h1 style="text-align:center;">{{ user["fname"] + " " + user["lname"] }}</h1>
-    <p><strong>NRIC: </strong>{{ user["NRIC"] }}</p>
+    <h1 style="text-align:center;">Hello, {{ user["fname"] + " " + user["lname"] }}</h1>
+    <p><strong>NRIC: </strong>{{ user["nric"] }}</p>
     <p><strong>Gender: </strong>{{ user["gender"]}}</p>
     <p><strong>Email: </strong>{{ user["email"] }}</p>
     <p><strong>DoB: </strong>{{ user["dob"] }}</p>
