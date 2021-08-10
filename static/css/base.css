@@ -33,3 +33,15 @@ span{
     height: 300px;
     padding-top: 50px;
 }
+
+table,th,td{
+    border: 2px solid black;
+}
+
+table{
+    width: 100%;
+}
+
+th{
+    text-align: center;
+}
