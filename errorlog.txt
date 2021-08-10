@@ -1,0 +1,9 @@
+2021-08-09 23:24:07.503558 , 404 Page not Found , http://127.0.0.1:5000/error/500/key , Unknown
+2021-08-09 23:25:04.663491 , 405 Access Denied , http://127.0.0.1:5000/error/405 , Unknown
+2021-08-09 23:26:28.075820 , 500 Server Error , KeyError: 'abc' , Unknown
+2021-08-09 23:26:59.601581 , 500 Server Error , IndexError: list index out of range , T1111111F
+2021-08-10 00:17:30.125507 , 401 Authentication Error , http://127.0.0.1:5000/login , T5739128U
+2021-08-10 00:39:55.215675 , 500 Server Error , ProgrammingError: not all arguments converted during bytes formatting , Unknown
+2021-08-10 00:42:38.604799 , 401 Authentication Error , Password Error , T1111111F
+2021-08-10 00:43:00.238119 , 401 Authentication Error , Account does not exist , T2222222F
+2021-08-10 15:33:26.662757 , 401 Authentication Error , Password Error , T1111111F
