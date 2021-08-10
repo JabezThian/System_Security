@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Nanyang Polyclinic - Error Log{% endblock %}
+
+{% block content %}
+
+<table>
+    <tr>
+        <th>Time</th>
+        <th>Error Code</th>
+        <th>Error Information</th>
+        <th>User</th>
+    </tr>
+    {% for i in range(line | length - 1, -1, -1) %}
+    <tr>
+        <td>{{line[i][0]}} </td>
+        <td>{{line[i][1]}}</td>
+        <td>{{line[i][2]}}</td>
+        <td>{{line[i][3]}}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}
