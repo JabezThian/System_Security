@@ -5,6 +5,8 @@ from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
 from flask_mysqldb import MySQL
 import MySQLdb.cursors
+import logging
+from logging.handlers import RotatingFileHandler
 
 import Applicant
 import Cart
@@ -57,15 +59,15 @@ def permission(perm, key):
     try:
         if key == "role":
             if session['user-role'] not in perm:
-                return abort(404)
+                return abort(403)
 
         elif key == "nric":
             if session["user-NRIC"] not in perm:
-                return abort(404)
+                return abort(403)
 
     except KeyError:
         if 'NULL' not in perm:
-            return abort(404)
+            return abort(403)
 
 
 @app.route('/')
@@ -124,6 +126,19 @@ def login():
 
         cursor.execute('SELECT NRIC, attempt FROM users WHERE NRIC = %s', (NRIC,))
         attempt_dict = cursor.fetchone()
+        
+        # NRIC or Password wrong
+        if not account:
+            global loginError
+            cursor.execute('SELECT * FROM users WHERE NRIC = %s', (NRIC,))
+            NRICacc = cursor.fetchone()
+
+            if NRICacc:
+                loginError = "Password Error"
+            else:
+                loginError = "Account does not exist"
+        
+        
         # Check if user is real and user's attempt is more than 5
         if attempt >= 3:
             if recaptcha.verify():
@@ -175,6 +190,9 @@ def login():
                 attempt += 1
                 session['attempt'] = attempt
                 print(attempt)
+                global failed_user
+                failed_user = NRIC
+                abort(401)
     return render_template('Login/login.html', **locals())
 
 
@@ -2153,9 +2171,79 @@ def show_dashboard3():
     return render_template("ApplicationForm/dashboard3.html")
 
 
+@app.route("/log/error")
+def log():
+    with open('errorlog.txt', 'r') as f:
+        line = [row for row in f]
+
+        index = 0
+
+        for row in line:
+            row = row.split(',')
+            line.pop(index)
+            line.insert(index, row)
+            index += 1
+
+        f.close()
+
+        return render_template("errorlog.html", line=line)
+
+
+@app.route("/error/500/key")
+def errorKey():
+    abc = session['abc']
+
+
+@app.route("/error/500/index")
+def errorIndex():
+    abc = list()
+    xyz = abc[1]
+
+
+@app.route("/error/405")
+def errorAccess():
+    permission('Admin', 'role')
+
+
+@app.errorhandler(401)
+def wrong_credentials(e):
+    app.logger.error(str(datetime.now()) + ' , 401 Authentication Error , ' + loginError + ' , ' + failed_user)
+
+    return redirect(url_for('login'))
+
+
+@app.errorhandler(403)
+def access_denied(e):
+    try:
+        app.logger.error(
+            str(datetime.now()) + ' , 403 Access Denied , ' + request.url + ' , ' + session['user-NRIC'])
+    except KeyError:
+        app.logger.error(
+            str(datetime.now()) + ' , 403 Access Denied , ' + request.url + ' , ' + "Unknown")
+
+    return render_template("error.html", err=404), 403
+
+
 @app.errorhandler(404)
-def page_not_handle(e):
-    return render_template("error404.html"), 404
+def page_not_found(e):
+    try:
+        app.logger.error(str(datetime.now()) + ' , 404 Page not Found , ' + request.url + ' , ' + session['user-NRIC'])
+    except KeyError:
+        app.logger.error(str(datetime.now()) + ' , 404 Page not Found , ' + request.url + ' , ' + 'Unknown')
+
+
+    return render_template("error.html", err=404), 404
+
+
+@app.errorhandler(Exception)
+def server_error(e):
+    try:
+        app.logger.error(str(datetime.now()) + ' , 500 Server Error , ' + type(e).__name__ + ': ' + str(e) + ' , ' + session['user-NRIC'])
+    except KeyError:
+        app.logger.error(str(datetime.now()) + ' , 500 Server Error , ' + type(e).__name__ + ': ' + str(e) + ' , ' + 'Unknown')
+
+    return render_template("error.html", err=500), 500
+
 
 
 if __name__ == '__main__':
