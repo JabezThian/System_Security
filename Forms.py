@@ -153,8 +153,9 @@ class UpdateProfileForm(Form):
 
 
 class ChangePasswordForm(Form):
-    Password = PasswordField("Password", [validators.DataRequired()])
-    Confirm = PasswordField("Confirm Password", [validators.DataRequired(), validators.EqualTo("Password")])
+    old_password = PasswordField("Current Password", [validators.DataRequired()])    # edited by Jabez
+    Password = PasswordField("New Password", [validators.DataRequired()])
+    Confirm = PasswordField("Confirm New Password", [validators.DataRequired()])
 
 
 class ResetPasswordForm(Form):
