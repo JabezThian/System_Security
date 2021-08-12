@@ -15,6 +15,7 @@ import Resend
 import appointments
 import qns
 import shelve
+import passGenerate
 import time
 from Forms import *
 from pyechart import bargraph, applicationbargraph, addressbargraph, agerangebargraph, monthlyQnbargraph, usernumber
@@ -43,7 +44,7 @@ app.config["DEFAULT_MAIL_SENDER"] = "nanyanghospital2021@gmail.com"
 # SQL Server
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'Sparklez2002'
+app.config['MYSQL_PASSWORD'] = 'Password'
 app.config['MYSQL_DB'] = 'nanyang_login'
 
 # Initialize MySQL
@@ -195,10 +196,14 @@ def login():
                         session["user-NRIC"] = account["nric"]
                         session["user-role"] = account["role"]
                         session['attempt'] = 0
-                        flash(
-                            f'{account["fname"]} {account["lname"]} has logged in!',
-                            'success')
-                        return redirect(url_for('home'))
+                        if account['reset_password'] == "T":
+                            # redirect to reset password instantly
+                            return redirect(url_for('change_password'))
+                        else:
+                            flash(
+                                f'{account["fname"]} {account["lname"]} has logged in!',
+                                'success')
+                            return redirect(url_for('home'))
                     else:
                         flash('Incorrect username or password', 'danger')
                         # SQL adding and counting failed attempts
@@ -241,10 +246,14 @@ def login():
                     session["user-NRIC"] = account["nric"]
                     session["user-role"] = account["role"]
                     session['attempt'] = 0
-                    flash(
-                        f'{account["fname"]} {account["lname"]} has logged in!',
-                        'success')
-                    return redirect(url_for('home'))
+                    if account['reset_password'] == "T":
+                        # redirect to reset password instantly
+                        return redirect(url_for('change_password'))
+                    else:
+                        flash(
+                            f'{account["fname"]} {account["lname"]} has logged in!',
+                            'success')
+                        return redirect(url_for('home'))
                 else:
                     flash('Incorrect username or password', 'danger')
                     # SQL adding and counting failed attempts
@@ -292,7 +301,7 @@ def profile():
         flash('Profile has been updated!', 'success')
         # Sending email to new Email address
         msg = Message(subject="Particulars Update", recipients=[form.Email.data],
-                      body="Dear {} {}, \nYour email and Date of Birth have been updated. If this was not you, please contact us @ +65 65553555".format({account['fname'], account['lname']}),
+                      body="Dear {} {}, \nYour email and Date of Birth have been updated. If this was not you, please contact us @ +65 65553555".format(account['fname'], account['lname']),
                       sender="nanyanghospital2021@gmail.com")
         mail.send(msg)
         return redirect(url_for('profile'))
@@ -300,6 +309,7 @@ def profile():
     return render_template("Login/profile.html", form=form, user=user)
 
 
+# Coded by Jabez
 # User password management
 @app.route('/change_password', methods=["GET", "POST"])
 def change_password():
@@ -310,13 +320,18 @@ def change_password():
     NRIC = session["user-NRIC"]
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('SELECT * from users WHERE nric = %s', (NRIC,))
+    old_password = cursor.fetchone()
 
     if request.method == "POST" and form.validate():
-        cursor.execute('UPDATE users SET password = %s WHERE NRIC = %s', (form.Password.data, NRIC,))
-        mysql.connection.commit()
-        flash('Password has been changed', 'success')
-
-        return redirect(url_for('home'))
+        if old_password['password'] == form.old_password.data and form.Password.data == form.Confirm.data:
+            cursor.execute('UPDATE users SET password = %s WHERE NRIC = %s', (form.Password.data, NRIC,))
+            mysql.connection.commit()
+            cursor.execute('UPDATE users SET reset_password = "F" WHERE NRIC = %s', (NRIC,))
+            mysql.connection.commit()
+            flash('Your password have been successfully updated', 'success')
+        else:
+            flash('Please make sure that your current password is correct and your new password matches', 'danger')
 
     return render_template('Login/change_password.html', form=form)
 
@@ -341,30 +356,43 @@ def confirm_token(token, expiration=300):
 
 
 # Edited by Jabez (entire route)
-@app.route('/reset_password', methods=["GET", "POST"])
-def reset_password():
+@app.route('/forget_password', methods=["GET", "POST"])
+def forget_password():
     form = ResetPasswordForm(request.form)
 
     if request.method == "POST" and form.validate():
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('SELECT * FROM users')
         SQLemail = cursor.fetchone()
+
         if recaptcha.verify():
             if form.Email.data == SQLemail['email']:
-                token = generate_confirmation_token(form.Email.data)
-                msg = Message(subject="Password reset", recipients=[form.Email.data],
-                              body="Link to reset password : {}{}. Link valid for only 5 minutes" \
-                              .format(request.url_root, url_for("confirm_reset", token=token)),
-                              sender="nanyanghospital2021@gmail.com")
+                cursor.execute('SELECT * FROM users WHERE email = %s', (SQLemail['email'],))
+                SQLdetails = cursor.fetchone()
+                first_name = SQLdetails['fname']
+                last_name = SQLdetails['lname']
+                email = SQLdetails['email']
+                NRIC = SQLdetails['nric']
+                new_password = passGenerate.new_pass()
+                msg = Message(subject='Nanyang Polyclinic Forget Password',
+                          sender=app.config.get("MAIL_USERNAME"),
+                          recipients=[email],
+                          body='Dear {} {},\n\nYour new password is {}. \nPlease Change your Password as soon as you login.'.format(first_name, last_name, new_password))
                 mail.send(msg)
-
+                # set new password in sql password
+                cursor.execute('UPDATE users SET password = %s WHERE NRIC = %s', (new_password, NRIC,))
+                mysql.connection.commit()
+                # set reset password to T
+                cursor.execute('UPDATE users SET reset_password = "T" WHERE NRIC = %s', (NRIC,))
+                mysql.connection.commit()
                 flash("Successfully entered email, if you have registered an account with us, a reset password email would be sent to your email", "success")
             else:
-                flash("Email not found! Please register your email.", "danger")
+                flash("Successfully entered email, if you have registered an account with us, a reset password email would be sent to your email", "success")
+                print("ADMIN --> No such email found!")
         else:
             flash("Please verify reCAPTCHA.", "danger")
 
-    return render_template("Login/reset_password.html", form=form)
+    return render_template("Login/forget_password.html", form=form)
 
 
 @app.route('/confirm_reset/<token>', methods=["GET", "POST"])
