@@ -16,11 +16,13 @@
         <th style="background-color: #4CAF50; color: white;text-align: left; padding: 8px;">Specialisation</th>
         <th style="background-color: #4CAF50; color: white;text-align: left; padding: 8px;">URL</th>
         <th style="background-color: #4CAF50; color: white;text-align: left; padding: 8px;">Update</th>
+        <th style="background-color: #4CAF50; color: white;text-align: left; padding: 8px;">Unlock Lockout</th>
+        <th style="background-color: #4CAF50; color: white;text-align: left; padding: 8px;">Lockout</th>
         <th style="background-color: #4CAF50; color: white;text-align: left; padding: 8px;">Delete</th>
     </tr>
-    {%for user in all_users%}
+    {% for user in all_users %}
     <tr style="nth-child(even){background-color: #f2f2f2}">
-        <td style="text-align: left;padding: 8px;">{{user["NRIC"]}}</td>
+        <td style="text-align: left;padding: 8px;">{{user["nric"]}}</td>
         <td style="text-align: left;padding: 8px;">{{user["fname"] + " " + user["lname"]}}</td>
         <td style="text-align: left;padding: 8px;">{{user["gender"]}}</td>
         <td style="text-align: left;padding: 8px;">{{user["dob"]}}</td>
@@ -37,8 +39,10 @@
         <td style="text-align: left;padding: 8px;">{{user["url"]}}</td>
         {%endif%}
 
-        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_update', uid=user['NRIC'])}}">Update</a></td>
-        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_delete', uid=user['NRIC'])}}">Delete</a></td>
+        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_update', uid=user['NRIC'])}}" class="btn btn-success">Update</a></td>
+        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_delete', uid=user['NRIC'])}}" class="btn btn-success">Unlock Lockout</a></td>
+        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_delete', uid=user['NRIC'])}}" class="btn btn-danger">Lockout</a></td>
+        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_delete', uid=user['NRIC'])}}" class="btn btn-danger">Delete</a></td>
     </tr>
     {%endfor%}
 </table>
