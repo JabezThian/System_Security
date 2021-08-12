@@ -261,11 +261,11 @@ p {
     <div class="form-group">
         {{ render_field(form.Dob, class="form-control") }}
     </div>
-    <input type="submit" value="Update" class="btn btn-primary" />
+    <input type="submit" value="Update" class="btn btn-success" />
+    <br>
+    <br>
+    <a class="btn btn-primary" href="{{url_for('change_password')}}">Change Password</a>
 </form>
-<div>
-    <p class="text-muted">Forgot Password? <a class="text-info" href="{{url_for('change_password')}}">Password Reset</a> </p>
-</div>
 </div>
 </aside>
 {%endblock%}
