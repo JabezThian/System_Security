@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Flask, render_template, redirect, url_for, request, flash, session, abort
 from flask_mail import Mail, Message
@@ -15,6 +15,7 @@ import Resend
 import appointments
 import qns
 import shelve
+import time
 from Forms import *
 from pyechart import bargraph, applicationbargraph, addressbargraph, agerangebargraph, monthlyQnbargraph, usernumber
 from flask_recaptcha import ReCaptcha
@@ -42,7 +43,7 @@ app.config["DEFAULT_MAIL_SENDER"] = "nanyanghospital2021@gmail.com"
 # SQL Server
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'Password'
+app.config['MYSQL_PASSWORD'] = 'Sparklez2002'
 app.config['MYSQL_DB'] = 'nanyang_login'
 
 # Initialize MySQL
@@ -124,7 +125,7 @@ def login():
         cursor.execute('SELECT * FROM users WHERE NRIC = %s AND password = %s', (NRIC, password))
         account = cursor.fetchone()
 
-        cursor.execute('SELECT NRIC, attempt FROM users WHERE NRIC = %s', (NRIC,))
+        cursor.execute('SELECT NRIC, attempt, lockout, lockout_time FROM users WHERE NRIC = %s', (NRIC,))
         attempt_dict = cursor.fetchone()
         
         # NRIC or Password wrong
@@ -137,16 +138,99 @@ def login():
                 loginError = "Password Error"
             else:
                 loginError = "Account does not exist"
-        
-        
-        # Check if user is real and user's attempt is more than 5
-        if attempt >= 3:
-            if recaptcha.verify():
-                print('New Device Added successfully')
-                if attempt_dict and attempt_dict['attempt'] >= 10:
+
+        if attempt_dict['lockout'] == 'temp':
+            # Checking for account lockout time
+            now = datetime.now()
+            current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+            ban_time = attempt_dict['lockout_time']
+            later = datetime.strptime(ban_time, "%Y-%m-%d %H:%M:%S")
+            if current_time < ban_time:
+                start = datetime.now().time()
+                end = later.time()
+                t1 = timedelta(hours=start.hour, minutes=start.minute, seconds=start.second)
+                t2 = timedelta(hours=end.hour, minutes=end.minute, seconds=end.second)
+                duration = t2 - t1
+                flash('Your account have been locked for {}'.format(duration), 'danger')
+            else:
+                cursor.execute('UPDATE users SET lockout = "limited" WHERE NRIC =%s', (NRIC,))
+                mysql.connection.commit()
+
+        elif attempt_dict['lockout'] == 'perm':
+            flash('Your account have been locked, please contact the admin!', 'danger')
+        else:
+            # Check if user is real and user's attempt is more than 5
+            if attempt >= 3:
+                if recaptcha.verify():
+                    print('New Device Added successfully')
+                    if attempt_dict['lockout'] == 'limited' and attempt_dict['attempt'] >= 12:
+                        cursor.execute('UPDATE users SET lockout = "perm" WHERE NRIC =%s', (NRIC,))
+                        mysql.connection.commit()
+                        flash('Your account have been locked, please contact the admin!', 'danger')
+                    elif attempt_dict['lockout'] != 'limited' and attempt_dict['attempt'] >= 9:
+                        # do not allow the user to login and flash incorrect password
+                        cursor.execute('UPDATE users SET lockout = "temp" WHERE NRIC =%s', (NRIC,))
+                        mysql.connection.commit()
+                        # Timer set for account lockout
+                        now = datetime.now()
+                        current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+                        later = datetime.now() + timedelta(minutes=1)
+                        ban_time = later.strftime("%Y-%m-%d %H:%M:%S")
+                        cursor.execute('UPDATE users SET lockout_time = %s WHERE NRIC =%s', (ban_time, NRIC,))
+                        mysql.connection.commit()
+                        if current_time < ban_time:
+                            start = datetime.now().time()
+                            end = later.time()
+                            t1 = timedelta(hours=start.hour, minutes=start.minute, seconds=start.second)
+                            t2 = timedelta(hours=end.hour, minutes=end.minute, seconds=end.second)
+                            duration = t2 - t1
+                            flash('Your account have been locked for {}!'.format(duration), 'danger')
+
+                    elif account:
+                        # resetting the attempts back to 0
+                        cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+                        mysql.connection.commit()  # Edited by Jabez
+                        session["user"] = account
+                        session["user-name"] = account["fname"] + " " + account["lname"]
+                        session["user-NRIC"] = account["nric"]
+                        session["user-role"] = account["role"]
+                        session['attempt'] = 0
+                        flash(
+                            f'{account["fname"]} {account["lname"]} has logged in!',
+                            'success')
+                        return redirect(url_for('home'))
+                    else:
+                        flash('Incorrect username or password', 'danger')
+                        # SQL adding and counting failed attempts
+                        cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+                        mysql.connection.commit()
+                        attempt += 1
+                        session['attempt'] = attempt
+                else:
+                    print('Error ReCaptcha')
+            else:  # When attempt is not more than 3
+                if attempt_dict['lockout'] == 'limited' and attempt_dict['attempt'] >= 12:
+                    cursor.execute('UPDATE users SET lockout = "perm" WHERE NRIC =%s', (NRIC,))
+                    mysql.connection.commit()
+                    flash('Your account have been locked, please contact the admin!', 'danger')
+                elif attempt_dict['lockout'] != 'limited' and attempt_dict['attempt'] >= 9:
                     # do not allow the user to login and flash incorrect password
-                    flash('Your account have been locked!', 'danger')
-                    # add timer
+                    cursor.execute('UPDATE users SET lockout = "temp" WHERE NRIC =%s', (NRIC,))
+                    mysql.connection.commit()
+                    # Timer set for account lockout
+                    now = datetime.now()
+                    current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+                    later = datetime.now() + timedelta(minutes=1)
+                    ban_time = later.strftime("%Y-%m-%d %H:%M:%S")
+                    cursor.execute('UPDATE users SET lockout_time = %s WHERE NRIC =%s', (ban_time, NRIC,))
+                    mysql.connection.commit()
+                    if current_time < ban_time:
+                        start = datetime.now().time()
+                        end = later.time()
+                        t1 = timedelta(hours=start.hour, minutes=start.minute, seconds=start.second)
+                        t2 = timedelta(hours=end.hour, minutes=end.minute, seconds=end.second)
+                        duration = t2 - t1
+                        flash('Your account have been locked for {}!'.format(duration), 'danger')
 
                 elif account:
                     # resetting the attempts back to 0
@@ -166,33 +250,13 @@ def login():
                     # SQL adding and counting failed attempts
                     cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
                     mysql.connection.commit()
-            else:
-                print('Error ReCaptcha')
-        else:  # When attempt is not more than 3
-            if account:
-                # resetting the attempts back to 0
-                cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
-                mysql.connection.commit()  # Edited by Jabez
-                session["user"] = account
-                session["user-name"] = account["fname"] + " " + account["lname"]
-                session["user-NRIC"] = account["nric"]
-                session["user-role"] = account["role"]
-                session['attempt'] = 0
-                flash(
-                    f'{account["fname"]} {account["lname"]} has logged in!',
-                    'success')
-                return redirect(url_for('home'))
-            else:
-                flash('Incorrect username or password', 'danger')
-                # SQL adding and counting failed attempts
-                cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
-                mysql.connection.commit()
-                attempt += 1
-                session['attempt'] = attempt
-                print(attempt)
-                global failed_user
-                failed_user = NRIC
-                abort(401)
+                    attempt += 1
+                    session['attempt'] = attempt
+                    print(attempt)
+                    # You cannot put this in here @Melvin
+                    # global failed_user
+                    # failed_user = NRIC
+                    # abort(401)
     return render_template('Login/login.html', **locals())
 
 
