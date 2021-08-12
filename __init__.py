@@ -290,10 +290,13 @@ def profile():
     NRIC = session["user-NRIC"]
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('SELECT * from users WHERE nric = %s', (NRIC,))
+    account = cursor.fetchone()
+    old_email = account['email']
     user = session["user"]
 
     if request.method == "POST" and form.validate():
-        cursor.execute('UPDATE users SET email = %s, dob = %s WHERE NRIC = %s', (form.Email.data, form.Dob.data, NRIC,))
+        cursor.execute('UPDATE users SET email = %s, dob = %s WHERE nric = %s', (form.Email.data, form.Dob.data, NRIC,))
         mysql.connection.commit()
         cursor.execute('SELECT * from users')
         account = cursor.fetchone()
@@ -304,6 +307,11 @@ def profile():
                       body="Dear {} {}, \nYour email and Date of Birth have been updated. If this was not you, please contact us @ +65 65553555".format(account['fname'], account['lname']),
                       sender="nanyanghospital2021@gmail.com")
         mail.send(msg)
+        if old_email != form.Email.data:
+            msg = Message(subject="Particulars Update", recipients=[old_email],
+                          body="Dear {} {}, \nYour email and Date of Birth have been updated. If this was not you, please contact us @ +65 65553555".format(account['fname'], account['lname']),
+                          sender="nanyanghospital2021@gmail.com")
+            mail.send(msg)
         return redirect(url_for('profile'))
 
     return render_template("Login/profile.html", form=form, user=user)
@@ -1272,6 +1280,12 @@ def admin_all_users():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM users')
     all_users = cursor.fetchall()
+    print(all_users)
+    # counter = 0
+    # for i in all_users:
+    #     counter += 1
+    #     i['id'] = counter
+    #     print(i)
 
     return render_template("Admin/all_users.html", all_users=all_users)
 
@@ -1284,12 +1298,12 @@ def admin_update(uid):
     form = AdminUpdateForm(request.form)
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute('SELECT * FROM users WHERE NRIC = %s', (uid,))
+    cursor.execute('SELECT * FROM users WHERE nric = %s', (uid,))
 
     user = cursor.fetchone()
 
     if request.method == "POST" and form.validate():
-        cursor.execute('UPDATE users SET email = %s, password = %s, url = %s WHERE NRIC = %s',
+        cursor.execute('UPDATE users SET email = %s, password = %s, url = %s WHERE nric = %s',
                        (form.Email.data, form.Password.data, form.URL.data, uid,))
         appointment_dict = db['Appointments']
         for appts in appointment_dict:
@@ -1308,7 +1322,7 @@ def admin_delete(uid):
     permission(["Admin"], "role")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute('DELETE * FROM users WHERE NRIC = %s', (uid,))
+    cursor.execute('DELETE * FROM users WHERE nric = %s', (uid,))
     flash("Successfully deleted user", "success")
     return redirect(url_for('admin_all_users'))
 
@@ -1328,7 +1342,7 @@ def add_doctor():
             return redirect(url_for('admin_all_users'))
         else:
             cursor.execute(
-                'INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role, specialization, url) '
+                'INSERT INTO users (nric, fname, lname, gender, dob, email, password, role, specialization, url) '
                 'VALUES (%s, %s, %s, %s, %s, %s, %s, "Doctor", %s, %s)',
                 (form.NRIC.data, form.FirstName.data, form.LastName.data, form.Gender.data,
                  form.Dob.data, form.Email.data, form.Password.data, form.specialization.data,
