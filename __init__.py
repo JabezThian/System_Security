@@ -7,6 +7,9 @@ from flask_mysqldb import MySQL
 import MySQLdb.cursors
 import logging
 from logging.handlers import RotatingFileHandler
+# Edited By Suja
+import pyotp
+from flask_bootstrap import Bootstrap
 
 import Applicant
 import Cart
@@ -32,6 +35,7 @@ app.config.update(dict(
 recaptcha = ReCaptcha()
 recaptcha.init_app(app)
 app.config["SECRET_KEY"] = b'o5Dg987*&G^@(E&FW)}'
+Bootstrap(app)
 
 # Email Server
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
@@ -154,6 +158,11 @@ def login():
 
         cursor.execute('SELECT NRIC, attempt, lockout, lockout_time FROM users WHERE NRIC = %s', (NRIC,))
         attempt_dict = cursor.fetchone()
+        
+        # direct to 2fa page
+        # Edited By Suja
+        if form.validate():
+            return redirect(url_for("login_2fa"))
         
         # NRIC or Password wrong
         if not account:
@@ -293,6 +302,27 @@ def login():
                     failed_user = NRIC
                     wrong_credentials(loginError)
     return render_template('Login/login.html', **locals())
+
+# Edited By Suja
+# 2fa page
+@app.route("/login/2fa/")
+def login_2fa():
+    secret = pyotp.random_base32()
+    return render_template("login_2fa.html", secret=secret)
+
+
+# 2fa form to key in otp generated in app
+@app.route("/login/2fa/", methods=["POST"])
+def login_2fa_form():
+    secret = request.form.get("secret")
+    otp = int(request.form.get("otp"))
+
+    if pyotp.TOTP(secret).verify(otp):
+        flash("The TOTP 2FA token is valid", "success")
+        return redirect(url_for("home"))
+    else:
+        flash("You have supplied an invalid 2FA TOKEN!", "danger")
+        return redirect(url_for("login_2fa"))
 
 
 # Logout system
