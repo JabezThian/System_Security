@@ -39,10 +39,10 @@
         <td style="text-align: left;padding: 8px;">{{user["url"]}}</td>
         {%endif%}
 
-        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_update', uid=user['NRIC'])}}" class="btn btn-success">Update</a></td>
-        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_delete', uid=user['NRIC'])}}" class="btn btn-success">Unlock Lockout</a></td>
-        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_delete', uid=user['NRIC'])}}" class="btn btn-danger">Lockout</a></td>
-        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_delete', uid=user['NRIC'])}}" class="btn btn-danger">Delete</a></td>
+        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_update', uid=user['nric'])}}" class="btn btn-success">Update</a></td>
+        <td style="text-align: left;padding: 8px;"><a href="{{url_for('unlockLockout', uid=user['nric'])}}" class="btn btn-success">Unlock Lockout</a></td>
+        <td style="text-align: left;padding: 8px;"><a href="{{url_for('lockLockout', uid=user['nric'])}}" class="btn btn-danger">Lockout</a></td>
+        <td style="text-align: left;padding: 8px;"><a href="{{url_for('admin_delete', uid=user['nric'])}}" class="btn btn-danger">Delete</a></td>
     </tr>
     {%endfor%}
 </table>
