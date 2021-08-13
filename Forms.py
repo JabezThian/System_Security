@@ -158,14 +158,26 @@ class ChangePasswordForm(Form):
     Confirm = PasswordField("Confirm New Password", [validators.DataRequired()])
 
 
+# Coded by Jabez
 class ResetPasswordForm(Form):
     Email = StringField("Email", [validators.DataRequired(), validators.Email()])
 
 
-class AdminUpdateForm(Form):
+# Coded by Jabez
+class AdminUpdatePasswordForm(Form):
+    Code = StringField("Verification code", [validators.DataRequired()])
+    New_Password = PasswordField("Password", [validators.DataRequired(), Length(min=8, max=30, message="Invalid Password Length")])
+
+
+# Coded by Jabez
+class AdminUpdateEmailForm(Form):
+    NRIC = StringField("NRIC Verification", [validators.DataRequired()])
     Email = StringField("Email", [validators.DataRequired(), validators.Email()])
-    Password = PasswordField("Password",
-                             [validators.DataRequired(), Length(min=8, max=30, message="Invalid Password Length")])
+
+
+# Coded by Jabez
+class AdminUpdateURLForm(Form):
+    Password = PasswordField("Password Verification", [validators.DataRequired()])
     URL = StringField("URL", [validators.optional()])
 
 
