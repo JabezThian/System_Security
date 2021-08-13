@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 
 from flask import Flask, render_template, redirect, url_for, request, flash, session, abort
 from flask_mail import Mail, Message
-from itsdangerous import URLSafeTimedSerializer
 from flask_mysqldb import MySQL
 import MySQLdb.cursors
 import logging
@@ -19,7 +18,6 @@ import appointments
 import qns
 import shelve
 import passGenerate
-import time
 from Forms import *
 from pyechart import bargraph, applicationbargraph, addressbargraph, agerangebargraph, monthlyQnbargraph, usernumber
 from flask_recaptcha import ReCaptcha
@@ -130,8 +128,9 @@ def register():
                 flash("This NRIC is already in used. You can login to access our service.", "danger")
                 return redirect(url_for('register'))
             else:
-                cursor.execute('INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role, attempt) '
-                               'VALUES (%s, %s, %s, %s, %s, %s, %s, "Patient", 0)',
+                # Updated by Jabez
+                cursor.execute('INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role, attempt, lockout, `lockout_time, reset_password) '
+                               'VALUES (%s, %s, %s, %s, %s, %s, %s, "Patient", 0, false, NULL, F)',
                                (NRIC, fname, lname, gender, dob, email, password,))
                 mysql.connection.commit()
                 flash(f'Account created for {form.FirstName.data} {form.LastName.data}!', 'success')
@@ -149,6 +148,7 @@ def login():
     form = LoginForm(request.form)
     attempt = session['attempt']
     if request.method == "POST" and form.validate():
+        # Edited by Jabez
         NRIC = form.NRIC.data
         password = form.Password.data
 
@@ -158,23 +158,13 @@ def login():
 
         cursor.execute('SELECT NRIC, attempt, lockout, lockout_time FROM users WHERE NRIC = %s', (NRIC,))
         attempt_dict = cursor.fetchone()
-        
-        # direct to 2fa page
-        # Edited By Suja
-        if form.validate():
-            return redirect(url_for("login_2fa"))
-        
-        # NRIC or Password wrong
-        if not account:
-            global loginError
-            cursor.execute('SELECT * FROM users WHERE NRIC = %s', (NRIC,))
-            NRICacc = cursor.fetchone()
 
-            if NRICacc:
-                loginError = "Password Error"
-            else:
-                loginError = "Account does not exist"
+        # Edited by Melvin
+        global loginError
+        cursor.execute('SELECT * FROM users WHERE NRIC = %s', (NRIC,))
+        NRICacc = cursor.fetchone()
 
+        # Edited by Jabez
         if attempt_dict['lockout'] == 'temp':
             # Checking for account lockout time
             now = datetime.now()
@@ -223,6 +213,11 @@ def login():
                             flash('Your account have been locked for {}!'.format(duration), 'danger')
 
                     elif account:
+                        # direct to 2fa page
+                        # Edited By Suja
+                        if form.validate():
+                            return redirect(url_for("login_2fa"))
+
                         # resetting the attempts back to 0
                         cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
                         mysql.connection.commit()  # Edited by Jabez
@@ -246,6 +241,13 @@ def login():
                         mysql.connection.commit()
                         attempt += 1
                         session['attempt'] = attempt
+
+                        # Edited by Melvin
+                        # NRIC or Password wrong
+                        if NRICacc:
+                            loginError = "Password Error"
+                        else:
+                            loginError = "Account does not exist"
                 else:
                     print('Error ReCaptcha')
             else:  # When attempt is not more than 3
@@ -273,6 +275,11 @@ def login():
                         flash('Your account have been locked for {}!'.format(duration), 'danger')
 
                 elif account:
+                    # direct to 2fa page
+                    # Edited By Suja
+                    if form.validate():
+                        return redirect(url_for("login_2fa"))
+
                     # resetting the attempts back to 0
                     cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
                     mysql.connection.commit()  # Edited by Jabez
@@ -297,11 +304,15 @@ def login():
                     attempt += 1
                     session['attempt'] = attempt
                     print(attempt)
+                    # Edited by Melvin
+                    # NRIC or Password wrong
+                    if NRICacc:
+                        loginError = "Password Error"
+                    else:
+                        loginError = "Account does not exist"
 
-                    global failed_user
-                    failed_user = NRIC
-                    wrong_credentials(loginError)
     return render_template('Login/login.html', **locals())
+
 
 # Edited By Suja
 # 2fa page
@@ -394,7 +405,7 @@ def change_password():
             mysql.connection.commit()
             cursor.execute('UPDATE users SET reset_password = "F" WHERE NRIC = %s', (NRIC,))
             mysql.connection.commit()
-            msg = Message(subject="Particulars Update", recipients=[form.Email.data],
+            msg = Message(subject="Particulars Update", recipients=[old_password['email']],
                           body="Dear {} {}, \nYour Password have been changed. If this was not you, please contact us @ +65 65553555".format(old_password['fname'], old_password['lname']),
                           sender="nanyanghospital2021@gmail.com")
             mail.send(msg)
@@ -1314,47 +1325,121 @@ def addPrescription():
 @app.route('/all_users')
 def admin_all_users():
     permission(["Admin"], "role")
-
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM users')
     all_users = cursor.fetchall()
-    print(all_users)
-    # counter = 0
-    # for i in all_users:
-    #     counter += 1
-    #     i['id'] = counter
-    #     print(i)
 
     return render_template("Admin/all_users.html", all_users=all_users)
 
 
+# Coded by Jabez
 @app.route('/admin_update/<uid>', methods=["GET", "POST"])
 def admin_update(uid):
     permission(["Admin"], "role")
-
     db = shelve.open("storage.db")
-    form = AdminUpdateForm(request.form)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('SELECT * FROM users WHERE nric = %s', (uid,))
+    user = cursor.fetchone()
+    appointment_dict = db['Appointments']
+    for appts in appointment_dict:
+        print(appointment_dict[appts])
+        if appointment_dict[appts].get_doctor() == user["fname"] + " " + user["lname"]:
+            appointment_dict[appts].set_url(user["url"])
+    db.close()
+
+    return render_template("Admin/admin_update.html", user=user)
+
+
+# Coded by Jabez
+@app.route('/admin_update/change_password_info/<uid>', methods=["GET", "POST"])
+def admin_change_password_info(uid):
+    permission(["Admin"], "role")
+    form = AdminUpdatePasswordForm(request.form)
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM users WHERE nric = %s', (uid,))
-
     user = cursor.fetchone()
+    code = passGenerate.new_code()
+    session['code'] = code
+    msg = Message(subject="Particulars Update", recipients=[user['email']],
+                  body="Dear {} {}, \nYour code is {}, please tell the admin the code to authenticate the Admin in helping you change your account password. \nYou may ignore this email if you did not request for a change of password with the Admin.".format(user['fname'], user['lname'], code),
+                  sender="nanyanghospital2021@gmail.com")
+    mail.send(msg)
 
+    return render_template("Admin/admin_change_password.html", user=user, form=form)
+
+
+# Coded by Jabez
+@app.route('/admin_update/change_password/<uid>', methods=["GET", "POST"])
+def admin_change_password(uid):
+    form = AdminUpdatePasswordForm(request.form)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('SELECT * FROM users WHERE nric = %s', (uid,))
+    user = cursor.fetchone()
     if request.method == "POST" and form.validate():
-        cursor.execute('UPDATE users SET email = %s, password = %s, url = %s WHERE nric = %s',
-                       (form.Email.data, form.Password.data, form.URL.data, uid,))
-        appointment_dict = db['Appointments']
-        for appts in appointment_dict:
-            print(appointment_dict[appts])
-            if appointment_dict[appts].get_doctor() == user["fname"] + " " + user["lname"]:
-                appointment_dict[appts].set_url(user["url"])
-        flash("Successfully updated", "success")
-        db.close()
-        return redirect(url_for("admin_all_users"))
+        if form.Code.data == session['code']:
+            cursor.execute('UPDATE users SET password = %s WHERE nric = %s', (form.New_Password.data, uid,))
+            mysql.connection.commit()
+            msg = Message(subject="Particulars Update", recipients=[user['email']],
+                          body="Dear {} {}, \nYour Password have been changed. If this was not intended, please contact us @ +65 65553555".format(user['fname'], user['lname']),
+                          sender="nanyanghospital2021@gmail.com")
+            mail.send(msg)
+            return redirect(url_for("admin_update", uid=user['nric']))
+        else:
+            flash('Invalid code! Try again!', 'danger')
 
-    return render_template("Admin/admin_update.html", user=user, form=form)
+    return render_template("Admin/admin_change_password.html", user=user, form=form)
 
 
+# Coded by Jabez
+@app.route('/admin_update/change_email/<uid>', methods=["GET", "POST"])
+def admin_change_email(uid):
+    form = AdminUpdateEmailForm(request.form)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('SELECT * FROM users WHERE nric = %s', (uid,))
+    user = cursor.fetchone()
+    if request.method == "POST" and form.validate():
+        if form.NRIC.data == user['nric']:
+            cursor.execute('UPDATE users SET email = %s WHERE nric = %s', (form.Email.data, uid,))
+            mysql.connection.commit()
+            msg = Message(subject="Particulars Update", recipients=[user['email']],
+                          body="Dear {} {}, \nYour Email have been changed. If this was not intended, please contact us @ +65 65553555".format(user['fname'], user['lname']),
+                          sender="nanyanghospital2021@gmail.com")
+            mail.send(msg)
+            msg = Message(subject="Particulars Update", recipients=[form.Email.data],
+                          body="Dear {} {}, \nYour Email have been changed. If this was not intended, please contact us @ +65 65553555".format(user['fname'], user['lname']),
+                          sender="nanyanghospital2021@gmail.com")
+            mail.send(msg)
+            return redirect(url_for("admin_update", uid=user['nric']))
+        else:
+            flash('Incorrect particulars!', 'danger')
+
+    return render_template("Admin/admin_change_email.html", user=user, form=form)
+
+
+# Coded by Jabez
+@app.route('/admin_update/change_URL/<uid>', methods=["GET", "POST"])
+def admin_change_URL(uid):
+    form = AdminUpdateURLForm(request.form)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('SELECT * FROM users WHERE nric = %s', (uid,))
+    user = cursor.fetchone()
+    if request.method == "POST" and form.validate():
+        if form.Password.data == user['password']:
+            cursor.execute('UPDATE users SET url = %s WHERE nric = %s', (form.URL.data, uid,))
+            mysql.connection.commit()
+            msg = Message(subject="URL Update", recipients=[user['email']],
+                          body="Dear {} {}, \nYour URL have been changed. If this was not intended, please contact us @ +65 65553555".format(user['fname'], user['lname']),
+                          sender="nanyanghospital2021@gmail.com")
+            mail.send(msg)
+            return redirect(url_for("admin_update", uid=user['nric']))
+        else:
+            flash('Incorrect particulars!', 'danger')
+
+    return render_template("Admin/admin_change_URL.html", user=user, form=form)
+
+
+# Coded by Jabez
 @app.route('/admin_delete/<uid>', methods=["GET"])
 def admin_delete(uid):
     permission(["Admin"], "role")
@@ -1362,6 +1447,28 @@ def admin_delete(uid):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('DELETE * FROM users WHERE nric = %s', (uid,))
     flash("Successfully deleted user", "success")
+    return redirect(url_for('admin_all_users'))
+
+
+# Coded by Jabez
+@app.route('/unlockLockout/<uid>', methods=["GET"])
+def unlockLockout(uid):
+    permission(["Admin"], "role")
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('UPDATE users SET lockout = "false" WHERE nric = %s', (uid,))
+    mysql.connection.commit()
+    flash("{} account is no longer lockout".format(uid), "success")
+    return redirect(url_for('admin_all_users'))
+
+
+# Coded by Jabez
+@app.route('/lockLockout/<uid>', methods=["GET"])
+def lockLockout(uid):
+    permission(["Admin"], "role")
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('UPDATE users SET lockout = "perm" WHERE nric = %s', (uid,))
+    mysql.connection.commit()
+    flash("{} account is now lockout".format(uid), "success")
     return redirect(url_for('admin_all_users'))
 
 
@@ -2373,7 +2480,6 @@ def page_not_found(e):
     except KeyError:
         app.logger.error(str(datetime.now()) + ' , 404 Page not Found , ' + request.url + ' , ' + 'Unknown')
 
-
     return render_template("error.html", err=404), 404
 
 
@@ -2385,7 +2491,6 @@ def server_error(e):
         app.logger.error(str(datetime.now()) + ' , 500 Server Error , ' + type(e).__name__ + ': ' + str(e) + ' , ' + 'Unknown')
 
     return render_template("error.html", err=500), 500
-
 
 
 if __name__ == '__main__':
