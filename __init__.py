@@ -72,6 +72,32 @@ def permission(perm, key):
             return abort(403)
 
 
+def check_input(input=None, types=None, length=None, min=None, max=None):
+    criteria = 0
+    counter = 0
+    if types is not None:
+        criteria += 1
+        if str(type(input)) == types:
+            counter += 1
+
+    if length is not None:
+        criteria += 1
+        if len(input) <= length:
+            counter += 1
+
+    if min is not None:
+        criteria += 1
+        if min <= input:
+            counter += 1
+
+    if max is not None:
+        criteria += 1
+        if max >= input:
+            counter += 1
+
+    return counter == criteria
+
+
 @app.route('/')
 def home():
     return render_template('home.html')
@@ -262,10 +288,10 @@ def login():
                     attempt += 1
                     session['attempt'] = attempt
                     print(attempt)
-                    # You cannot put this in here @Melvin
-                    # global failed_user
-                    # failed_user = NRIC
-                    # abort(401)
+
+                    global failed_user
+                    failed_user = NRIC
+                    wrong_credentials(loginError)
     return render_template('Login/login.html', **locals())
 
 
@@ -827,14 +853,23 @@ def buy_item(id):
             cart = cart_dict[user_id]
 
             if item.get_item_want() > item.get_item_have():
-                item.set_item_want(0)
-                flash("Not enough stock at the moment, try again later", 'danger')
+                try:
+                    app.logger.error(
+                        str(datetime.now()) + ' , Not Enough Stock (ID: ' + str(item.get_item_id()) + '), Stock Available: ' + str(item.get_item_have()) + ' / Stock Wanted: ' + str(item.get_item_want()) + ' , ' + session['user-NRIC'])
+                except KeyError:
+                    app.logger.error(
+                        str(datetime.now()) + ' , Not Enough Stock (ID: ' + str(item.get_item_id()) + '), Stock Available: ' + str(item.get_item_have()) + ' / Stock Wanted: ' + str(item.get_item_want()) + ' , ' + 'Unknown')
+                finally:
+                    item.set_item_want(0)
+                    flash("Not enough stock at the moment, try again later", 'danger')
             elif cart.check(item):
                 cart.remove(item)
                 item.set_item_want(buy_item_form.want.data)
                 cart.add(item)
+                flash("Item has been successfully added to cart!", "success")
             else:
                 cart.add(item)
+                flash("Item has been successfully added to cart!", "success")
 
         except KeyError:
             temp_cart = [item]
@@ -845,7 +880,6 @@ def buy_item(id):
             db['Cart'] = cart_dict
             db['Items'] = item_dict
             db.close()
-            flash("Item has been successfully added to cart!", "success")
 
         return redirect(url_for('show_items'))
 
@@ -1117,8 +1151,18 @@ def prescribe_item(id):
             pres = pres_dict[user_id]
 
             if item.get_item_want() > item.get_item_have():
-                item.set_item_want(0)
-                flash("Not enough stock at the moment, try again later", 'danger')
+                try:
+                    app.logger.error(
+                        str(datetime.now()) + ' , Not Enough Stock (ID: ' + str(item.get_item_id()) + '), Stock Available: ' + str(
+                            item.get_item_have()) + ' / Stock Wanted: ' + str(item.get_item_want()) + ' , ' + session[
+                            'user-NRIC'])
+                except KeyError:
+                    app.logger.error(
+                        str(datetime.now()) + ' , Not Enough Stock (ID: ' + str(item.get_item_id()) + '), Stock Available: ' + str(
+                            item.get_item_have()) + ' / Stock Wanted: ' + str(item.get_item_want()) + ' , ' + 'Unknown')
+                finally:
+                    item.set_item_want(0)
+                    flash("Not enough stock at the moment, try again later", 'danger')
             elif pres.check(item):
                 pres.remove(item)
                 item.set_item_want(prescribe_item_form.quantity.data)
@@ -2315,8 +2359,6 @@ def errorAccess():
 def wrong_credentials(e):
     app.logger.error(str(datetime.now()) + ' , 401 Authentication Error , ' + loginError + ' , ' + failed_user)
 
-    return redirect(url_for('login'))
-
 
 @app.errorhandler(403)
 def access_denied(e):
@@ -2353,4 +2395,14 @@ def server_error(e):
 
 
 if __name__ == '__main__':
+    logHandler = RotatingFileHandler('errorlog.txt')
+
+    # set the log handler level
+    logHandler.setLevel(logging.INFO)
+
+    # set the app logger level
+    app.logger.setLevel(logging.INFO)
+
+    app.logger.addHandler(logHandler)
+
     app.run(debug=True)
