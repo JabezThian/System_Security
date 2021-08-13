@@ -306,6 +306,7 @@ def logout():
     return redirect(url_for("home"))
 
 
+# Edited by Jabez
 # Profile System
 @app.route('/profile', methods=["GET", "POST"])
 def profile():
@@ -363,30 +364,15 @@ def change_password():
             mysql.connection.commit()
             cursor.execute('UPDATE users SET reset_password = "F" WHERE NRIC = %s', (NRIC,))
             mysql.connection.commit()
+            msg = Message(subject="Particulars Update", recipients=[form.Email.data],
+                          body="Dear {} {}, \nYour Password have been changed. If this was not you, please contact us @ +65 65553555".format(old_password['fname'], old_password['lname']),
+                          sender="nanyanghospital2021@gmail.com")
+            mail.send(msg)
             flash('Your password have been successfully updated', 'success')
         else:
             flash('Please make sure that your current password is correct and your new password matches', 'danger')
 
     return render_template('Login/change_password.html', form=form)
-
-
-# Helper functions to reset email
-def generate_confirmation_token(email):
-    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
-    return serializer.dumps(email, salt=app.config['SECRET_KEY'])
-
-
-def confirm_token(token, expiration=300):
-    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
-    try:
-        email = serializer.loads(
-            token,
-            salt=app.config['SECRET_KEY'],
-            max_age=expiration
-        )
-    except:
-        return False
-    return email
 
 
 # Edited by Jabez (entire route)
@@ -427,28 +413,6 @@ def forget_password():
             flash("Please verify reCAPTCHA.", "danger")
 
     return render_template("Login/forget_password.html", form=form)
-
-
-@app.route('/confirm_reset/<token>', methods=["GET", "POST"])
-def confirm_reset(token):
-    form = ChangePasswordForm(request.form)
-
-    NRIC = session["user-NRIC"]
-
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    if request.method == "POST" and form.validate():
-        cursor.execute('UPDATE users SET password = %s WHERE NRIC = %s', (form.Password.data, NRIC,))
-        mysql.connection.commit()
-        flash("Successfully reset password", "success")
-        return redirect(url_for("login"))
-
-    else:
-        email = confirm_token(token)
-        if email:
-            return render_template("Login/new_password.html", token=token, form=form)
-        else:
-            flash("Token expired, please try again", "danger")
-            return redirect(url_for('home'))
 
 
 # Online Pharmacy
