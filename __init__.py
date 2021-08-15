@@ -129,8 +129,8 @@ def register():
                 return redirect(url_for('register'))
             else:
                 # Updated by Jabez
-                cursor.execute('INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role, attempt, lockout, `lockout_time, reset_password) '
-                               'VALUES (%s, %s, %s, %s, %s, %s, %s, "Patient", 0, false, NULL, F)',
+                cursor.execute('INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role, attempt, lockout, lockout_time, reset_password)'
+                               'VALUES (%s, %s, %s, %s, %s, %s, %s, "Patient", 0, "false", NULL , "F")',
                                (NRIC, fname, lname, gender, dob, email, password,))
                 mysql.connection.commit()
                 flash(f'Account created for {form.FirstName.data} {form.LastName.data}!', 'success')
