@@ -132,7 +132,7 @@ class RegisterForm(Form):
     Email = StringField("Email", [validators.DataRequired(), validators.Email()])
     #Edited by Suja
     Password = PasswordField("Password",
-                             [validators.DataRequired(), Regexp('^[ABCDEFGHIJKLMNOPQRSTUVWXYZ]{1}[abcdefghijklmnopqrstuvwxyz]{3}[0-9]{4}[!@#$%&*?]{1}$', message='Invalid Password, '
+                             [validators.DataRequired(), Regexp('^[ABCDEFGHIJKLMNOPQRSTUVWXYZ]{1}[abcdefghijklmnopqrstuvwxyz]{5}[0-9]{3}[!@#$%&*?]{1}$', message='Invalid Password, '
                                                                                                                          'Must contain at least 1 uppercase letter, '
                                                                                                                          'Must contain at least 1 lowercase letter, '
                                                                                                                          'Must contain at least one number, '
