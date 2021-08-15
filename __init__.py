@@ -1,26 +1,29 @@
-from datetime import datetime, timedelta
-
-from flask import Flask, render_template, redirect, url_for, request, flash, session, abort
-from flask_mail import Mail, Message
-from flask_mysqldb import MySQL
-import MySQLdb.cursors
 import logging
+import shelve
+from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
+
+import MySQLdb.cursors
+import bcrypt
 # Edited By Suja
 import pyotp
+from cryptography.fernet import Fernet
+from flask import Flask, render_template, redirect, url_for, request, flash, session, abort
 from flask_bootstrap import Bootstrap
+from flask_mail import Mail, Message
+from flask_mysqldb import MySQL
+from flask_recaptcha import ReCaptcha
+from sqlalchemy.sql.functions import user
 
 import Applicant
 import Cart
 import Item
 import Resend
 import appointments
-import qns
-import shelve
 import passGenerate
+import qns
 from Forms import *
 from pyechart import bargraph, applicationbargraph, addressbargraph, agerangebargraph, monthlyQnbargraph, usernumber
-from flask_recaptcha import ReCaptcha
 
 app = Flask(__name__, static_url_path='/static')
 
@@ -46,7 +49,7 @@ app.config["DEFAULT_MAIL_SENDER"] = "nanyanghospital2021@gmail.com"
 # SQL Server
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'Password'
+app.config['MYSQL_PASSWORD'] = '3uwxrmlfaqiM'
 app.config['MYSQL_DB'] = 'nanyang_login'
 
 # Initialize MySQL
@@ -56,6 +59,16 @@ mail = Mail(app)
 
 @app.before_first_request
 def do_something_once_only():
+    session['attempt'] = 0
+
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('SELECT * FROM users WHERE NRIC = %s', ('T5739128U', ))  # Edited by Jabez
+    account = cursor.fetchone()
+    session["user"] = account
+    session["user-name"] = account["fname"] + " " + account["lname"]
+    session["user-NRIC"] = account["nric"]
+    session["user-role"] = account["role"]
     session['attempt'] = 0
 
 
@@ -128,10 +141,15 @@ def register():
                 flash("This NRIC is already in used. You can login to access our service.", "danger")
                 return redirect(url_for('register'))
             else:
+                key = Fernet.generate_key()
+                f = Fernet(key)
+                password = f.encrypt(password.encode())
+
                 # Updated by Jabez
-                cursor.execute('INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, role, attempt, lockout, lockout_time, reset_password)'
-                               'VALUES (%s, %s, %s, %s, %s, %s, %s, "Patient", 0, "false", NULL , "F")',
-                               (NRIC, fname, lname, gender, dob, email, password,))
+                cursor.execute(
+                    'INSERT INTO users (NRIC, fname, lname, gender, dob, email, password, symmetrickey, role, attempt, lockout, lockout_time, reset_password)'
+                    'VALUES (%s, %s, %s, %s, %s, %s, %s, %s,"Patient", 0, "false", NULL , "F")',
+                    (NRIC, fname, lname, gender, dob, email, password, key,))
                 mysql.connection.commit()
                 flash(f'Account created for {form.FirstName.data} {form.LastName.data}!', 'success')
                 return redirect(url_for('login'))
@@ -148,168 +166,176 @@ def login():
     form = LoginForm(request.form)
     attempt = session['attempt']
     if request.method == "POST" and form.validate():
+
         # Edited by Jabez
         NRIC = form.NRIC.data
         password = form.Password.data
 
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM users WHERE NRIC = %s AND password = %s', (NRIC, password))
+        cursor.execute('SELECT * FROM users WHERE NRIC = %s ', (NRIC,))
         account = cursor.fetchone()
 
-        cursor.execute('SELECT NRIC, attempt, lockout, lockout_time FROM users WHERE NRIC = %s', (NRIC,))
-        attempt_dict = cursor.fetchone()
+        if account:
+            key = (account['symmetrickey'])
+            f = Fernet(key)
+            decryptedpassword_Binary = f.decrypt(account['password'].encode())
+            decryptedpassword = decryptedpassword_Binary.decode()
 
-        # Edited by Melvin
-        global loginError
-        cursor.execute('SELECT * FROM users WHERE NRIC = %s', (NRIC,))
-        NRICacc = cursor.fetchone()
+            if decryptedpassword == password:
+                cursor.execute('SELECT NRIC, attempt, lockout, lockout_time FROM users WHERE NRIC = %s', (NRIC,))
+                attempt_dict = cursor.fetchone()
 
-        # Edited by Jabez
-        if attempt_dict['lockout'] == 'temp':
-            # Checking for account lockout time
-            now = datetime.now()
-            current_time = now.strftime("%Y-%m-%d %H:%M:%S")
-            ban_time = attempt_dict['lockout_time']
-            later = datetime.strptime(ban_time, "%Y-%m-%d %H:%M:%S")
-            if current_time < ban_time:
-                start = datetime.now().time()
-                end = later.time()
-                t1 = timedelta(hours=start.hour, minutes=start.minute, seconds=start.second)
-                t2 = timedelta(hours=end.hour, minutes=end.minute, seconds=end.second)
-                duration = t2 - t1
-                flash('Your account have been locked for {}'.format(duration), 'danger')
-            else:
-                cursor.execute('UPDATE users SET lockout = "limited" WHERE NRIC =%s', (NRIC,))
-                mysql.connection.commit()
+                # Edited by Melvin
+                global loginError
+                cursor.execute('SELECT * FROM users WHERE NRIC = %s', (NRIC,))
+                NRICacc = cursor.fetchone()
 
-        elif attempt_dict['lockout'] == 'perm':
-            flash('Your account have been locked, please contact the admin!', 'danger')
-        else:
-            # Check if user is real and user's attempt is more than 5
-            if attempt >= 3:
-                if recaptcha.verify():
-                    print('New Device Added successfully')
-                    if attempt_dict['lockout'] == 'limited' and attempt_dict['attempt'] >= 12:
-                        cursor.execute('UPDATE users SET lockout = "perm" WHERE NRIC =%s', (NRIC,))
-                        mysql.connection.commit()
-                        flash('Your account have been locked, please contact the admin!', 'danger')
-                    elif attempt_dict['lockout'] != 'limited' and attempt_dict['attempt'] >= 9:
-                        # do not allow the user to login and flash incorrect password
-                        cursor.execute('UPDATE users SET lockout = "temp" WHERE NRIC =%s', (NRIC,))
-                        mysql.connection.commit()
-                        # Timer set for account lockout
-                        now = datetime.now()
-                        current_time = now.strftime("%Y-%m-%d %H:%M:%S")
-                        later = datetime.now() + timedelta(minutes=1)
-                        ban_time = later.strftime("%Y-%m-%d %H:%M:%S")
-                        cursor.execute('UPDATE users SET lockout_time = %s WHERE NRIC =%s', (ban_time, NRIC,))
-                        mysql.connection.commit()
-                        if current_time < ban_time:
-                            start = datetime.now().time()
-                            end = later.time()
-                            t1 = timedelta(hours=start.hour, minutes=start.minute, seconds=start.second)
-                            t2 = timedelta(hours=end.hour, minutes=end.minute, seconds=end.second)
-                            duration = t2 - t1
-                            flash('Your account have been locked for {}!'.format(duration), 'danger')
-
-                    elif account:
-                        # direct to 2fa page
-                        # Edited By Suja
-                        if form.validate():
-                            return redirect(url_for("login_2fa"))
-
-                        # resetting the attempts back to 0
-                        cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
-                        mysql.connection.commit()  # Edited by Jabez
-                        session["user"] = account
-                        session["user-name"] = account["fname"] + " " + account["lname"]
-                        session["user-NRIC"] = account["nric"]
-                        session["user-role"] = account["role"]
-                        session['attempt'] = 0
-                        if account['reset_password'] == "T":
-                            # redirect to reset password instantly
-                            return redirect(url_for('change_password'))
-                        else:
-                            flash(
-                                f'{account["fname"]} {account["lname"]} has logged in!',
-                                'success')
-                            return redirect(url_for('home'))
-                    else:
-                        flash('Incorrect username or password', 'danger')
-                        # SQL adding and counting failed attempts
-                        cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
-                        mysql.connection.commit()
-                        attempt += 1
-                        session['attempt'] = attempt
-
-                        # Edited by Melvin
-                        # NRIC or Password wrong
-                        if NRICacc:
-                            loginError = "Password Error"
-                        else:
-                            loginError = "Account does not exist"
-                else:
-                    print('Error ReCaptcha')
-            else:  # When attempt is not more than 3
-                if attempt_dict['lockout'] == 'limited' and attempt_dict['attempt'] >= 12:
-                    cursor.execute('UPDATE users SET lockout = "perm" WHERE NRIC =%s', (NRIC,))
-                    mysql.connection.commit()
-                    flash('Your account have been locked, please contact the admin!', 'danger')
-                elif attempt_dict['lockout'] != 'limited' and attempt_dict['attempt'] >= 9:
-                    # do not allow the user to login and flash incorrect password
-                    cursor.execute('UPDATE users SET lockout = "temp" WHERE NRIC =%s', (NRIC,))
-                    mysql.connection.commit()
-                    # Timer set for account lockout
+                # Edited by Jabez
+                if attempt_dict['lockout'] == 'temp':
+                    # Checking for account lockout time
                     now = datetime.now()
                     current_time = now.strftime("%Y-%m-%d %H:%M:%S")
-                    later = datetime.now() + timedelta(minutes=1)
-                    ban_time = later.strftime("%Y-%m-%d %H:%M:%S")
-                    cursor.execute('UPDATE users SET lockout_time = %s WHERE NRIC =%s', (ban_time, NRIC,))
-                    mysql.connection.commit()
+                    ban_time = attempt_dict['lockout_time']
+                    later = datetime.strptime(ban_time, "%Y-%m-%d %H:%M:%S")
                     if current_time < ban_time:
                         start = datetime.now().time()
                         end = later.time()
                         t1 = timedelta(hours=start.hour, minutes=start.minute, seconds=start.second)
                         t2 = timedelta(hours=end.hour, minutes=end.minute, seconds=end.second)
                         duration = t2 - t1
-                        flash('Your account have been locked for {}!'.format(duration), 'danger')
-
-                elif account:
-                    # direct to 2fa page
-                    # Edited By Suja
-                    if form.validate():
-                        return redirect(url_for("login_2fa"))
-
-                    # resetting the attempts back to 0
-                    cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
-                    mysql.connection.commit()  # Edited by Jabez
-                    session["user"] = account
-                    session["user-name"] = account["fname"] + " " + account["lname"]
-                    session["user-NRIC"] = account["nric"]
-                    session["user-role"] = account["role"]
-                    session['attempt'] = 0
-                    if account['reset_password'] == "T":
-                        # redirect to reset password instantly
-                        return redirect(url_for('change_password'))
+                        flash('Your account have been locked for {}'.format(duration), 'danger')
                     else:
-                        flash(
-                            f'{account["fname"]} {account["lname"]} has logged in!',
-                            'success')
-                        return redirect(url_for('home'))
+                        cursor.execute('UPDATE users SET lockout = "limited" WHERE NRIC =%s', (NRIC,))
+                        mysql.connection.commit()
+
+                elif attempt_dict['lockout'] == 'perm':
+                    flash('Your account have been locked, please contact the admin!', 'danger')
                 else:
-                    flash('Incorrect username or password', 'danger')
-                    # SQL adding and counting failed attempts
-                    cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
-                    mysql.connection.commit()
-                    attempt += 1
-                    session['attempt'] = attempt
-                    print(attempt)
-                    # Edited by Melvin
-                    # NRIC or Password wrong
-                    if NRICacc:
-                        loginError = "Password Error"
-                    else:
-                        loginError = "Account does not exist"
+                    # Check if user is real and user's attempt is more than 5
+                    if attempt >= 3:
+                        if recaptcha.verify():
+                            print('New Device Added successfully')
+                            if attempt_dict['lockout'] == 'limited' and attempt_dict['attempt'] >= 12:
+                                cursor.execute('UPDATE users SET lockout = "perm" WHERE NRIC =%s', (NRIC,))
+                                mysql.connection.commit()
+                                flash('Your account have been locked, please contact the admin!', 'danger')
+                            elif attempt_dict['lockout'] != 'limited' and attempt_dict['attempt'] >= 9:
+                                # do not allow the user to login and flash incorrect password
+                                cursor.execute('UPDATE users SET lockout = "temp" WHERE NRIC =%s', (NRIC,))
+                                mysql.connection.commit()
+                                # Timer set for account lockout
+                                now = datetime.now()
+                                current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+                                later = datetime.now() + timedelta(minutes=1)
+                                ban_time = later.strftime("%Y-%m-%d %H:%M:%S")
+                                cursor.execute('UPDATE users SET lockout_time = %s WHERE NRIC =%s', (ban_time, NRIC,))
+                                mysql.connection.commit()
+                                if current_time < ban_time:
+                                    start = datetime.now().time()
+                                    end = later.time()
+                                    t1 = timedelta(hours=start.hour, minutes=start.minute, seconds=start.second)
+                                    t2 = timedelta(hours=end.hour, minutes=end.minute, seconds=end.second)
+                                    duration = t2 - t1
+                                    flash('Your account have been locked for {}!'.format(duration), 'danger')
+
+                            elif account:
+                                # direct to 2fa page
+                                # Edited By Suja
+                                if form.validate():
+                                    return redirect(url_for("login_2fa"))
+
+                                # resetting the attempts back to 0
+                                cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+                                mysql.connection.commit()  # Edited by Jabez
+                                session["user"] = account
+                                session["user-name"] = account["fname"] + " " + account["lname"]
+                                session["user-NRIC"] = account["nric"]
+                                session["user-role"] = account["role"]
+                                session['attempt'] = 0
+                                if account['reset_password'] == "T":
+                                    # redirect to reset password instantly
+                                    return redirect(url_for('change_password'))
+                                else:
+                                    flash(
+                                        f'{account["fname"]} {account["lname"]} has logged in!',
+                                        'success')
+                                    return redirect(url_for('home'))
+                            else:
+                                flash('Incorrect username or password', 'danger')
+                                # SQL adding and counting failed attempts
+                                cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+                                mysql.connection.commit()
+                                attempt += 1
+                                session['attempt'] = attempt
+
+                                # Edited by Melvin
+                                # NRIC or Password wrong
+                                if NRICacc:
+                                    loginError = "Password Error"
+                                else:
+                                    loginError = "Account does not exist"
+                        else:
+                            print('Error ReCaptcha')
+                    else:  # When attempt is not more than 3
+                        if attempt_dict['lockout'] == 'limited' and attempt_dict['attempt'] >= 12:
+                            cursor.execute('UPDATE users SET lockout = "perm" WHERE NRIC =%s', (NRIC,))
+                            mysql.connection.commit()
+                            flash('Your account have been locked, please contact the admin!', 'danger')
+                        elif attempt_dict['lockout'] != 'limited' and attempt_dict['attempt'] >= 9:
+                            # do not allow the user to login and flash incorrect password
+                            cursor.execute('UPDATE users SET lockout = "temp" WHERE NRIC =%s', (NRIC,))
+                            mysql.connection.commit()
+                            # Timer set for account lockout
+                            now = datetime.now()
+                            current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+                            later = datetime.now() + timedelta(minutes=1)
+                            ban_time = later.strftime("%Y-%m-%d %H:%M:%S")
+                            cursor.execute('UPDATE users SET lockout_time = %s WHERE NRIC =%s', (ban_time, NRIC,))
+                            mysql.connection.commit()
+                            if current_time < ban_time:
+                                start = datetime.now().time()
+                                end = later.time()
+                                t1 = timedelta(hours=start.hour, minutes=start.minute, seconds=start.second)
+                                t2 = timedelta(hours=end.hour, minutes=end.minute, seconds=end.second)
+                                duration = t2 - t1
+                                flash('Your account have been locked for {}!'.format(duration), 'danger')
+
+                        elif account:
+                            # direct to 2fa page
+                            # Edited By Suja
+                            if form.validate():
+                                return redirect(url_for("login_2fa"))
+
+                            # resetting the attempts back to 0
+                            cursor.execute('UPDATE users SET attempt = 0 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+                            mysql.connection.commit()  # Edited by Jabez
+                            session["user"] = account
+                            session["user-name"] = account["fname"] + " " + account["lname"]
+                            session["user-NRIC"] = account["nric"]
+                            session["user-role"] = account["role"]
+                            session['attempt'] = 0
+                            if account['reset_password'] == "T":
+                                # redirect to reset password instantly
+                                return redirect(url_for('change_password'))
+                            else:
+                                flash(
+                                    f'{account["fname"]} {account["lname"]} has logged in!',
+                                    'success')
+                                return redirect(url_for('home'))
+                        else:
+                            flash('Incorrect username or password', 'danger')
+                            # SQL adding and counting failed attempts
+                            cursor.execute('UPDATE users SET attempt = attempt + 1 WHERE NRIC = %s', (NRIC,))  # Edited by Jabez
+                            mysql.connection.commit()
+                            attempt += 1
+                            session['attempt'] = attempt
+                            print(attempt)
+                            # Edited by Melvin
+                            # NRIC or Password wrong
+                            if NRICacc:
+                                loginError = "Password Error"
+                            else:
+                                loginError = "Account does not exist"
 
     return render_template('Login/login.html', **locals())
 
@@ -396,12 +422,22 @@ def change_password():
     NRIC = session["user-NRIC"]
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute('SELECT * from users WHERE nric = %s', (NRIC,))
+    cursor.execute('SELECT * from users WHERE NRIC = %s', (NRIC,))
     old_password = cursor.fetchone()
 
     if request.method == "POST" and form.validate():
-        if old_password['password'] == form.old_password.data and form.Password.data == form.Confirm.data:
-            cursor.execute('UPDATE users SET password = %s WHERE NRIC = %s', (form.Password.data, NRIC,))
+        key = old_password['symmetrickey']
+        f = Fernet(key)
+        decryptedpassword_Binary = f.decrypt(old_password['password'].encode())
+        decryptedpassword = decryptedpassword_Binary.decode()
+
+        if decryptedpassword == form.old_password.data and form.Password.data == form.Confirm.data:
+            password = form.Password.data
+            key = Fernet.generate_key()
+            f = Fernet(key)
+            password = f.encrypt(password.encode())
+
+            cursor.execute('UPDATE users SET password = %s WHERE NRIC = %s', (password, NRIC,))
             mysql.connection.commit()
             cursor.execute('UPDATE users SET reset_password = "F" WHERE NRIC = %s', (NRIC,))
             mysql.connection.commit()
@@ -2422,75 +2458,75 @@ def show_dashboard3():
     return render_template("ApplicationForm/dashboard3.html")
 
 
-@app.route("/log/error")
-def log():
-    with open('errorlog.txt', 'r') as f:
-        line = [row for row in f]
-
-        index = 0
-
-        for row in line:
-            row = row.split(',')
-            line.pop(index)
-            line.insert(index, row)
-            index += 1
-
-        f.close()
-
-        return render_template("errorlog.html", line=line)
-
-
-@app.route("/error/500/key")
-def errorKey():
-    abc = session['abc']
-
-
-@app.route("/error/500/index")
-def errorIndex():
-    abc = list()
-    xyz = abc[1]
-
-
-@app.route("/error/405")
-def errorAccess():
-    permission('Admin', 'role')
-
-
-@app.errorhandler(401)
-def wrong_credentials(e):
-    app.logger.error(str(datetime.now()) + ' , 401 Authentication Error , ' + loginError + ' , ' + failed_user)
-
-
-@app.errorhandler(403)
-def access_denied(e):
-    try:
-        app.logger.error(
-            str(datetime.now()) + ' , 403 Access Denied , ' + request.url + ' , ' + session['user-NRIC'])
-    except KeyError:
-        app.logger.error(
-            str(datetime.now()) + ' , 403 Access Denied , ' + request.url + ' , ' + "Unknown")
-
-    return render_template("error.html", err=404), 403
-
-
-@app.errorhandler(404)
-def page_not_found(e):
-    try:
-        app.logger.error(str(datetime.now()) + ' , 404 Page not Found , ' + request.url + ' , ' + session['user-NRIC'])
-    except KeyError:
-        app.logger.error(str(datetime.now()) + ' , 404 Page not Found , ' + request.url + ' , ' + 'Unknown')
-
-    return render_template("error.html", err=404), 404
-
-
-@app.errorhandler(Exception)
-def server_error(e):
-    try:
-        app.logger.error(str(datetime.now()) + ' , 500 Server Error , ' + type(e).__name__ + ': ' + str(e) + ' , ' + session['user-NRIC'])
-    except KeyError:
-        app.logger.error(str(datetime.now()) + ' , 500 Server Error , ' + type(e).__name__ + ': ' + str(e) + ' , ' + 'Unknown')
-
-    return render_template("error.html", err=500), 500
+# @app.route("/log/error")
+# def log():
+#     with open('errorlog.txt', 'r') as f:
+#         line = [row for row in f]
+#
+#         index = 0
+#
+#         for row in line:
+#             row = row.split(',')
+#             line.pop(index)
+#             line.insert(index, row)
+#             index += 1
+#
+#         f.close()
+#
+#         return render_template("errorlog.html", line=line)
+#
+#
+# @app.route("/error/500/key")
+# def errorKey():
+#     abc = session['abc']
+#
+#
+# @app.route("/error/500/index")
+# def errorIndex():
+#     abc = list()
+#     xyz = abc[1]
+#
+#
+# @app.route("/error/405")
+# def errorAccess():
+#     permission('Admin', 'role')
+#
+#
+# @app.errorhandler(401)
+# def wrong_credentials(e):
+#     app.logger.error(str(datetime.now()) + ' , 401 Authentication Error , ' + loginError + ' , ' + failed_user)
+#
+#
+# @app.errorhandler(403)
+# def access_denied(e):
+#     try:
+#         app.logger.error(
+#             str(datetime.now()) + ' , 403 Access Denied , ' + request.url + ' , ' + session['user-NRIC'])
+#     except KeyError:
+#         app.logger.error(
+#             str(datetime.now()) + ' , 403 Access Denied , ' + request.url + ' , ' + "Unknown")
+#
+#     return render_template("error.html", err=404), 403
+#
+#
+# @app.errorhandler(404)
+# def page_not_found(e):
+#     try:
+#         app.logger.error(str(datetime.now()) + ' , 404 Page not Found , ' + request.url + ' , ' + session['user-NRIC'])
+#     except KeyError:
+#         app.logger.error(str(datetime.now()) + ' , 404 Page not Found , ' + request.url + ' , ' + 'Unknown')
+#
+#     return render_template("error.html", err=404), 404
+#
+#
+# @app.errorhandler(Exception)
+# def server_error(e):
+#     try:
+#         app.logger.error(str(datetime.now()) + ' , 500 Server Error , ' + type(e).__name__ + ': ' + str(e) + ' , ' + session['user-NRIC'])
+#     except KeyError:
+#         app.logger.error(str(datetime.now()) + ' , 500 Server Error , ' + type(e).__name__ + ': ' + str(e) + ' , ' + 'Unknown')
+#
+#     return render_template("error.html", err=500), 500
 
 
 if __name__ == '__main__':
