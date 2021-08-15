@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
 
 import MySQLdb.cursors
-import bcrypt
 # Edited By Suja
 import pyotp
 from cryptography.fernet import Fernet
@@ -2458,75 +2457,75 @@ def show_dashboard3():
     return render_template("ApplicationForm/dashboard3.html")
 
 
-# @app.route("/log/error")
-# def log():
-#     with open('errorlog.txt', 'r') as f:
-#         line = [row for row in f]
-#
-#         index = 0
-#
-#         for row in line:
-#             row = row.split(',')
-#             line.pop(index)
-#             line.insert(index, row)
-#             index += 1
-#
-#         f.close()
-#
-#         return render_template("errorlog.html", line=line)
-#
-#
-# @app.route("/error/500/key")
-# def errorKey():
-#     abc = session['abc']
-#
-#
-# @app.route("/error/500/index")
-# def errorIndex():
-#     abc = list()
-#     xyz = abc[1]
-#
-#
-# @app.route("/error/405")
-# def errorAccess():
-#     permission('Admin', 'role')
-#
-#
-# @app.errorhandler(401)
-# def wrong_credentials(e):
-#     app.logger.error(str(datetime.now()) + ' , 401 Authentication Error , ' + loginError + ' , ' + failed_user)
-#
-#
-# @app.errorhandler(403)
-# def access_denied(e):
-#     try:
-#         app.logger.error(
-#             str(datetime.now()) + ' , 403 Access Denied , ' + request.url + ' , ' + session['user-NRIC'])
-#     except KeyError:
-#         app.logger.error(
-#             str(datetime.now()) + ' , 403 Access Denied , ' + request.url + ' , ' + "Unknown")
-#
-#     return render_template("error.html", err=404), 403
-#
-#
-# @app.errorhandler(404)
-# def page_not_found(e):
-#     try:
-#         app.logger.error(str(datetime.now()) + ' , 404 Page not Found , ' + request.url + ' , ' + session['user-NRIC'])
-#     except KeyError:
-#         app.logger.error(str(datetime.now()) + ' , 404 Page not Found , ' + request.url + ' , ' + 'Unknown')
-#
-#     return render_template("error.html", err=404), 404
-#
-#
-# @app.errorhandler(Exception)
-# def server_error(e):
-#     try:
-#         app.logger.error(str(datetime.now()) + ' , 500 Server Error , ' + type(e).__name__ + ': ' + str(e) + ' , ' + session['user-NRIC'])
-#     except KeyError:
-#         app.logger.error(str(datetime.now()) + ' , 500 Server Error , ' + type(e).__name__ + ': ' + str(e) + ' , ' + 'Unknown')
-#
-#     return render_template("error.html", err=500), 500
+@app.route("/log/error")
+def log():
+    with open('errorlog.txt', 'r') as f:
+        line = [row for row in f]
+
+        index = 0
+
+        for row in line:
+            row = row.split(',')
+            line.pop(index)
+            line.insert(index, row)
+            index += 1
+
+        f.close()
+
+        return render_template("errorlog.html", line=line)
+
+
+@app.route("/error/500/key")
+def errorKey():
+    abc = session['abc']
+
+
+@app.route("/error/500/index")
+def errorIndex():
+    abc = list()
+    xyz = abc[1]
+
+
+@app.route("/error/405")
+def errorAccess():
+    permission('Admin', 'role')
+
+
+@app.errorhandler(401)
+def wrong_credentials(e):
+    app.logger.error(str(datetime.now()) + ' , 401 Authentication Error , ' + loginError + ' , ' + failed_user)
+
+
+@app.errorhandler(403)
+def access_denied(e):
+    try:
+        app.logger.error(
+            str(datetime.now()) + ' , 403 Access Denied , ' + request.url + ' , ' + session['user-NRIC'])
+    except KeyError:
+        app.logger.error(
+            str(datetime.now()) + ' , 403 Access Denied , ' + request.url + ' , ' + "Unknown")
+
+    return render_template("error.html", err=404), 403
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    try:
+        app.logger.error(str(datetime.now()) + ' , 404 Page not Found , ' + request.url + ' , ' + session['user-NRIC'])
+    except KeyError:
+        app.logger.error(str(datetime.now()) + ' , 404 Page not Found , ' + request.url + ' , ' + 'Unknown')
+
+    return render_template("error.html", err=404), 404
+
+
+@app.errorhandler(Exception)
+def server_error(e):
+    try:
+        app.logger.error(str(datetime.now()) + ' , 500 Server Error , ' + type(e).__name__ + ': ' + str(e) + ' , ' + session['user-NRIC'])
+    except KeyError:
+        app.logger.error(str(datetime.now()) + ' , 500 Server Error , ' + type(e).__name__ + ': ' + str(e) + ' , ' + 'Unknown')
+
+    return render_template("error.html", err=500), 500
 
 
 if __name__ == '__main__':
