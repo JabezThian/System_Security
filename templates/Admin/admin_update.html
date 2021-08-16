@@ -1,11 +1,10 @@
 {% extends "base.html" %}
-{% block title %}NYP - Admin | Update User{% endblock %}
+{% block title %}NYP - Register{% endblock %}
 {%block content%}
 {% from "includes/_formhelper.html" import render_field %}
 <style>
 
-h1,
-h2 {
+h1, h2 {
   font-weight: 500;
   margin: 0px 0px 5px 0px;
 }
@@ -14,12 +13,6 @@ h1 {
   font-size: 30px;
 }
 
-h2 {
-  font-size: 16px;
-}
-h1 {
-  font-size: 30px;
-}
 p {
   margin: 0px;
 }
@@ -90,7 +83,7 @@ p {
   height: 45%;
   display: inline-block;
   float: left;
-  padding: 1px 20px 30px 20px;
+  padding: 50px 20px 30px 20px;
   background: #FFFFFF;
   margin-top: 50px;
   text-align: left;
@@ -245,30 +238,36 @@ p {
     }
   }
 }
-img {
-  border-radius: 50%;
-}
 </style>
 <aside class="profile-card">
-    <header>
-    <a style="font-size:7em;margin-top:5px;margin-left:90px;"></a>
-    <img src="https://th.bing.com/th/id/OIP.O5fS4VUEkFOLfpZhFrcYVQHaHa?pid=ImgDet&rs=1" alt="Paris" width="300" height="300"></header>
-<div class="update-info">
-<h1 class="display-4" style="text-align:center; font-size:49px; margin-top:8.5px;">Update User</h1>
-    <form method="post" action="{{url_for('admin_update', uid=user['NRIC'])}}">
+<header>
+    <a style="font-size:7em;margin-top:5px;margin-left:90px;">
+        <i class="fa fa-fw fa-user fa-30px"></i>
+    </a>
+    <h1 style="text-align:center;">{{ user["fname"] + " " + user["lname"] }}</h1>
+    <p><strong>NRIC: </strong>{{ user["nric"] }}</p>
+    <p><strong>Gender: </strong>{{ user["gender"]}}</p>
+    <p><strong>Email: </strong>{{ user["email"] }}</p>
+    <p><strong>DoB: </strong>{{ user["dob"] }}</p>
+    <p><strong>Role: </strong>{{ user["role"] }}</p>
 
+</header>
+<div class="update-info">
+<form method="POST" action="{{url_for('profile')}}">
+    <h1 style="text-align:center;"> User Update </h1>
+    <br>
     <div class="form-group">
-        {{ render_field(form.Email, class="form-control", value=user["email"]) }}
+        <a class="btn btn-primary" href="{{url_for('admin_change_email', uid=user['nric'])}}">Change Email</a>
     </div>
     <div class="form-group">
-        {{ render_field(form.Password, class="form-control", value=user["password"]) }}
+        <a class="btn btn-primary" href="{{url_for('admin_change_password_info', uid=user['nric'])}}">Change Password</a>
     </div>
     {% if user['role'] == "Doctor" %}
     <div class="form-group">
-        {{ render_field(form.URL, class="form-control", value=user["url"]) }}
+        <a class="btn btn-primary" href="{{url_for('admin_change_URL', uid=user['nric'])}}">Change URL</a>
     </div>
     {%endif%}
-    <input type="submit" value="Update!">
 </form>
 </div>
+</aside>
 {%endblock%}
