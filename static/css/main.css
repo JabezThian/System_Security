@@ -672,7 +672,7 @@ a.article-title:hover {
 /* Shopping Cart */
 /* Container */
 .sc-container {
-    width: 1060px;
+    width: 80%;
     background: white;
     border: 20px solid #EFEFEF;
     display: inline-block;
@@ -688,7 +688,7 @@ a.article-title:hover {
     border-top: solid 1px #DDD;
     margin: 0px 8px 0px 8px;
     height: 250px;
-    width: 1000px;
+    width: 900px;
     padding-left:10px
 }
 
@@ -729,7 +729,7 @@ a.article-title:hover {
 .sc-checkout-container {
     display: inline-block;
     border: 18px #EFEFEF solid;
-    width: 257px;
+    width: 20%;
 }
 
 /* Elements */
@@ -742,9 +742,9 @@ a.article-title:hover {
 
 .sc-head-price {
     float: right;
-    font-size: 10px
+    font-size: 10px;
     font-weight: 300;
-    margin: 30px 0px 0px 5px;
+    margin: 30px 80px 0px 5px;
     display: inline;
 }
 
