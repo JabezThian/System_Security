@@ -130,13 +130,13 @@ class RegisterForm(Form):
                          choices=[('', 'Select'), ('F', 'Female'), ('M', 'Male')], default='')
     Dob = DateField('Date of Birth', [validators.DataRequired()])
     Email = StringField("Email", [validators.DataRequired(), validators.Email()])
-    #Edited by Suja
+    # Edited by Suja
     Password = PasswordField("Password",
-                             [validators.DataRequired(), Regexp('^[ABCDEFGHIJKLMNOPQRSTUVWXYZ]{1}[abcdefghijklmnopqrstuvwxyz]{5}[0-9]{3}[!@#$%&*?]{1}$', message='Invalid Password, '
+                             [validators.DataRequired(), Regexp('^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).+$', message='Invalid Password, '
                                                                                                                          'Must contain at least 1 uppercase letter, '
                                                                                                                          'Must contain at least 1 lowercase letter, '
                                                                                                                          'Must contain at least one number, '
-                                                                                                                         'Must contain at least one special character, '), Length(min=8, max=30, message="Invalid Password Length")])
+                                                                                                                         'Must contain at least one special character'), Length(min=8, max=30, message="Invalid Password Length")])
     Confirm = PasswordField("Confirm Password", [validators.DataRequired(), validators.EqualTo("Password")])
     URL = StringField("URL", [validators.optional()])
     specialization = StringField("Specialization", [validators.optional()])
