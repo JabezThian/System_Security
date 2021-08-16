@@ -51,7 +51,7 @@ app.config["DEFAULT_MAIL_SENDER"] = "nanyanghospital2021@gmail.com"
 # SQL Server
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'Sparklez2002'
+app.config['MYSQL_PASSWORD'] = 'Password'
 app.config['MYSQL_DB'] = 'nanyang_login'
 
 # Initialize MySQL
