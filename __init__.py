@@ -1524,7 +1524,7 @@ def admin_delete(uid):
 def unlockLockout(uid):
     permission(["Admin"], "role")
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute('UPDATE users SET lockout = "false", attempts = 0 WHERE nric = %s', (uid,))
+    cursor.execute('UPDATE users SET lockout = "false", attempt = 0 WHERE nric = %s', (uid,))
     mysql.connection.commit()
     flash("{} account is no longer lockout".format(uid), "success")
     return redirect(url_for('admin_all_users'))
