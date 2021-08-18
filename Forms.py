@@ -176,6 +176,12 @@ class AdminUpdateEmailForm(Form):
 
 
 # Coded by Jabez
+class AdminDeleteConfirm(Form):
+    NRIC = StringField("NRIC Verification", [validators.DataRequired()])
+    Code = StringField("Verification Code", [validators.DataRequired()])
+
+
+# Coded by Jabez
 class AdminUpdateURLForm(Form):
     Password = PasswordField("Password Verification", [validators.DataRequired()])
     URL = StringField("URL", [validators.optional()])
