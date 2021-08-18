@@ -51,7 +51,7 @@ app.config["DEFAULT_MAIL_SENDER"] = "nanyanghospital2021@gmail.com"
 # SQL Server
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = '3uwxrmlfaqiM'
+app.config['MYSQL_PASSWORD'] = 'password'
 app.config['MYSQL_DB'] = 'nanyang_login'
 
 # Initialize MySQL
@@ -945,6 +945,7 @@ def buy_item(id):
             cart = cart_dict[user_id]
 
             if item.get_item_want() > item.get_item_have():
+                print(item.get_item_want(), "\n", item.get_item_have())
                 try:
                     app.logger.error(
                         str(datetime.now()) + ' , Not Enough Stock (ID: ' + str(item.get_item_id()) + '), Stock Available: ' + str(item.get_item_have()) + ' / Stock Wanted: ' + str(item.get_item_want()) + ' , ' + session['user-NRIC'])
@@ -2607,4 +2608,4 @@ if __name__ == '__main__':
 
     app.logger.addHandler(logHandler)
 
-    app.run(debug=True)
+    app.run()
