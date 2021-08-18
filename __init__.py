@@ -51,7 +51,7 @@ app.config["DEFAULT_MAIL_SENDER"] = "nanyanghospital2021@gmail.com"
 # SQL Server
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'password'
+app.config['MYSQL_PASSWORD'] = 'Password'
 app.config['MYSQL_DB'] = 'nanyang_login'
 
 # Initialize MySQL
@@ -441,9 +441,6 @@ def profile():
     if request.method == "POST" and form.validate():
         cursor.execute('UPDATE users SET email = %s, dob = %s WHERE nric = %s', (form.Email.data, form.Dob.data, NRIC,))
         mysql.connection.commit()
-        cursor.execute('SELECT * from users')
-        account = cursor.fetchone()
-        session["user"] = account
         flash('Profile has been updated!', 'success')
         # Sending email to new Email address
         msg = Message(subject="Particulars Update", recipients=[form.Email.data],
@@ -1540,15 +1537,46 @@ def admin_change_URL(uid):
 
 
 # Coded by Jabez
-@app.route('/admin_delete/<uid>', methods=["GET"])
-def admin_delete(uid):
+@app.route('/admin_delete_confirm/<uid>', methods=["GET"])
+def admin_delete_confirm(uid):
     permission(["Admin"], "role")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute('DELETE FROM users WHERE nric = %s', (uid,))
-    mysql.connection.commit()
-    flash("Successfully deleted user", "success")
-    return redirect(url_for('admin_all_users'))
+    cursor.execute('SELECT * FROM users WHERE nric = %s', (uid,))
+    user = cursor.fetchone()
+    verify_code = passGenerate.new_code()
+    session["verifyCode"] = verify_code
+    msg = Message(subject="NYP Account Deleted", recipients=[user['email']],
+                  body="Dear {} {}, \nYour deletion verification code is {}. If this was not intended, please contact us @ +65 65553555".format(user['fname'], user['lname'], verify_code),
+                  sender="nanyanghospital2021@gmail.com")
+    mail.send(msg)
+
+    return redirect(url_for("admin_delete", uid=user['nric']))
+
+
+# Coded by Jabez
+@app.route('/admin_delete/<uid>', methods=["GET", "POST"])
+def admin_delete(uid):
+    permission(["Admin"], "role")
+
+    form = AdminDeleteConfirm(request.form)
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('SELECT * FROM users WHERE nric = %s', (uid,))
+    user = cursor.fetchone()
+    if request.method == "POST" and form.validate():
+        if form.NRIC.data == user['nric'] and form.Code.data == session["verifyCode"]:
+            msg = Message(subject="NYP Account Deleted", recipients=[user['email']],
+                          body="Dear {} {}, \nYour NYP Account has been deleted. If this was not intended, please contact us @ +65 65553555".format(user['fname'], user['lname']),
+                          sender="nanyanghospital2021@gmail.com")
+            mail.send(msg)
+            cursor.execute('DELETE FROM users WHERE nric = %s', (uid,))
+            mysql.connection.commit()
+            flash("Successfully deleted {}".format(uid), "success")
+            return redirect(url_for("admin_all_users", uid=user['nric']))
+        else:
+            flash('Incorrect particulars!', 'danger')
+
+    return render_template("Admin/admin_delete_confirm.html", user=user, form=form)
 
 
 # Coded by Jabez
@@ -1569,7 +1597,7 @@ def lockLockout(uid):
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('UPDATE users SET lockout = "perm" WHERE nric = %s', (uid,))
     mysql.connection.commit()
-    flash("{} account is now lockout".format(uid), "success")
+    flash("{} account has been lockout".format(uid), "danger")
     return redirect(url_for('admin_all_users'))
 
 
@@ -2608,4 +2636,4 @@ if __name__ == '__main__':
 
     app.logger.addHandler(logHandler)
 
-    app.run()
+    app.run(debug=True)
