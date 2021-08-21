@@ -154,8 +154,16 @@ class UpdateProfileForm(Form):
 
 class ChangePasswordForm(Form):
     old_password = PasswordField("Current Password", [validators.DataRequired()])    # edited by Jabez
-    Password = PasswordField("New Password", [validators.DataRequired()])
-    Confirm = PasswordField("Confirm New Password", [validators.DataRequired()])
+    Password = PasswordField("New Password", [validators.DataRequired(), Regexp('^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).+$', message='Invalid Password, '
+                                                                                                                         'Must contain at least 1 uppercase letter, '
+                                                                                                                         'Must contain at least 1 lowercase letter, '
+                                                                                                                         'Must contain at least one number, '
+                                                                                                                         'Must contain at least one special character'), Length(min=8, max=30, message="Invalid Password Length")])
+    Confirm = PasswordField("Confirm New Password", [validators.DataRequired(), Regexp('^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).+$', message='Invalid Password, '
+                                                                                                                         'Must contain at least 1 uppercase letter, '
+                                                                                                                         'Must contain at least 1 lowercase letter, '
+                                                                                                                         'Must contain at least one number, '
+                                                                                                                         'Must contain at least one special character'), Length(min=8, max=30, message="Invalid Password Length")])
 
 
 # Coded by Jabez
@@ -166,7 +174,11 @@ class ResetPasswordForm(Form):
 # Coded by Jabez
 class AdminUpdatePasswordForm(Form):
     Code = StringField("Verification code", [validators.DataRequired()])
-    New_Password = PasswordField("Password", [validators.DataRequired(), Length(min=8, max=30, message="Invalid Password Length")])
+    New_Password = PasswordField("Password", [validators.DataRequired(), Regexp('^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).+$', message='Invalid Password, '
+                                                                                                                         'Must contain at least 1 uppercase letter, '
+                                                                                                                         'Must contain at least 1 lowercase letter, '
+                                                                                                                         'Must contain at least one number, '
+                                                                                                                         'Must contain at least one special character'), Length(min=8, max=30, message="Invalid Password Length")])
 
 
 # Coded by Jabez
@@ -207,7 +219,6 @@ class DocAppointmentForm(Form):
         global plist
         super().__init__(form)
         plist = patient_list
-
 
     Department = SelectField("Department", [validators.DataRequired()],
                              choices=[('', 'Select'), ('Cardiology', 'Cardiology'),
