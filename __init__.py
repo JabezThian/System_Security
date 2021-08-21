@@ -51,7 +51,7 @@ app.config["DEFAULT_MAIL_SENDER"] = "nanyanghospital2021@gmail.com"
 # SQL Server
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'Password'
+app.config['MYSQL_PASSWORD'] = 'Sparklez2002'
 app.config['MYSQL_DB'] = 'nanyang_login'
 
 # Initialize MySQL
@@ -230,18 +230,18 @@ def login():
                 if attempt >= 3:
                     if recaptcha.verify():
                         print('New Device Added successfully')
-                        if attempt_dict['lockout'] == 'limited' and attempt_dict['attempt'] >= 6:
+                        if attempt_dict['lockout'] == 'limited' and attempt_dict['attempt'] >= 11:
                             cursor.execute('UPDATE users SET lockout = "perm" WHERE nric =%s', (NRIC,))
                             mysql.connection.commit()
                             flash('Your account have been locked, please contact the admin!', 'danger')
-                        elif attempt_dict['lockout'] != 'limited' and attempt_dict['attempt'] >= 4:
+                        elif attempt_dict['lockout'] != 'limited' and attempt_dict['attempt'] >= 9:
                             # do not allow the user to login and flash incorrect password
                             cursor.execute('UPDATE users SET lockout = "temp" WHERE nric =%s', (NRIC,))
                             mysql.connection.commit()
                             # Timer set for account lockout
                             now = datetime.now()
                             current_time = now.strftime("%Y-%m-%d %H:%M:%S")
-                            later = datetime.now() + timedelta(minutes=1)
+                            later = datetime.now() + timedelta(minutes=30)
                             ban_time = later.strftime("%Y-%m-%d %H:%M:%S")
                             cursor.execute('UPDATE users SET lockout_time = %s WHERE nric =%s', (ban_time, NRIC,))
                             mysql.connection.commit()
@@ -287,18 +287,18 @@ def login():
                         print('Error ReCaptcha')
 
                 else:  # When attempt is not more than 3
-                    if attempt_dict['lockout'] == 'limited' and attempt_dict['attempt'] >= 6:
+                    if attempt_dict['lockout'] == 'limited' and attempt_dict['attempt'] >= 11:
                         cursor.execute('UPDATE users SET lockout = "perm" WHERE nric =%s', (NRIC,))
                         mysql.connection.commit()
                         flash('Your account have been locked, please contact the admin!', 'danger')
-                    elif attempt_dict['lockout'] != 'limited' and attempt_dict['attempt'] >= 4:
+                    elif attempt_dict['lockout'] != 'limited' and attempt_dict['attempt'] >= 9:
                         # do not allow the user to login and flash incorrect password
                         cursor.execute('UPDATE users SET lockout = "temp" WHERE nric =%s', (NRIC,))
                         mysql.connection.commit()
                         # Timer set for account lockout
                         now = datetime.now()
                         current_time = now.strftime("%Y-%m-%d %H:%M:%S")
-                        later = datetime.now() + timedelta(minutes=1)
+                        later = datetime.now() + timedelta(minutes=30)
                         ban_time = later.strftime("%Y-%m-%d %H:%M:%S")
                         cursor.execute('UPDATE users SET lockout_time = %s WHERE NRIC =%s', (ban_time, NRIC,))
                         mysql.connection.commit()
@@ -386,7 +386,7 @@ def login_2fa_form():
     secret = request.form.get("secret")
     otp = int(request.form.get("otp"))
 
-    if pyotp.TOTP(secret).verify(otp) or otp == 123456:
+    if pyotp.TOTP(secret).verify(otp):
         NRIC = session['NRIC']
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('SELECT * FROM users WHERE NRIC = %s ', (NRIC,))
@@ -1546,8 +1546,8 @@ def admin_delete_confirm(uid):
     user = cursor.fetchone()
     verify_code = passGenerate.new_code()
     session["verifyCode"] = verify_code
-    msg = Message(subject="NYP Account Deleted", recipients=[user['email']],
-                  body="Dear {} {}, \nYour deletion verification code is {}. If this was not intended, please contact us @ +65 65553555".format(user['fname'], user['lname'], verify_code),
+    msg = Message(subject="NYP Verification Code", recipients=[user['email']],
+                  body="Dear {} {}, \n\nYour deletion verification code is {}. If this was not intended, please contact us @ +65 65553555 \n\n Regards, \n Nanyang Polyclinic".format(user['fname'], user['lname'], verify_code),
                   sender="nanyanghospital2021@gmail.com")
     mail.send(msg)
 
@@ -1566,7 +1566,7 @@ def admin_delete(uid):
     if request.method == "POST" and form.validate():
         if form.NRIC.data == user['nric'] and form.Code.data == session["verifyCode"]:
             msg = Message(subject="NYP Account Deleted", recipients=[user['email']],
-                          body="Dear {} {}, \nYour NYP Account has been deleted. If this was not intended, please contact us @ +65 65553555".format(user['fname'], user['lname']),
+                          body="Dear {} {}, \n\nYour NYP Account has been deleted. If this was not intended, please contact us @ +65 65553555 \n\n Regards, \n Nanyang Polyclinic".format(user['fname'], user['lname']),
                           sender="nanyanghospital2021@gmail.com")
             mail.send(msg)
             cursor.execute('DELETE FROM users WHERE nric = %s', (uid,))
